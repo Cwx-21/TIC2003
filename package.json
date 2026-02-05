@@ -1,0 +1,20 @@
+{
+  "name": "hypecheck-monorepo",
+  "version": "1.0.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --prefix apps/web",
+    "dev:api": "npm run dev --prefix apps/api",
+    "dev:etl": "python3 apps/etl/main.py",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down",
+    "setup:api": "cd apps/api && npm install",
+    "setup:web": "cd apps/web && npm install",
+    "setup:etl": "pip3 install -r apps/etl/requirements.txt"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

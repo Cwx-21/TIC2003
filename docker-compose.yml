@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: hypecheck-db
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: hypecheck
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    networks:
+      - hypecheck-network
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: hypecheck-api
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+      - DATABASE_URL=postgres://user:password@postgres:5432/hypecheck
+    depends_on:
+      - postgres
+    networks:
+      - hypecheck-network
+    # volume mount for hot reload in dev
+    volumes:
+      - ./apps/api:/app
+      - /app/node_modules
+
+  etl:
+    build:
+      context: ./apps/etl
+      dockerfile: Dockerfile
+    container_name: hypecheck-etl
+    environment:
+      - DATABASE_URL=postgres://user:password@postgres:5432/hypecheck
+    depends_on:
+      - postgres
+    networks:
+      - hypecheck-network
+    volumes:
+      - ./apps/etl:/app
+
+networks:
+  hypecheck-network:
+    driver: bridge
