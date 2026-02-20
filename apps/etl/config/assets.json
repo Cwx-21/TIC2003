@@ -1,0 +1,59 @@
+{
+  "assets": [
+    {
+      "symbol": "BTC",
+      "name": "Bitcoin",
+      "type": "crypto",
+      "keywords": ["bitcoin", "btc", "satoshi"],
+      "subreddits": ["bitcoin", "cryptocurrency"],
+      "base_price": 65000.0
+    },
+    {
+      "symbol": "ETH",
+      "name": "Ethereum",
+      "type": "crypto",
+      "keywords": ["ethereum", "eth", "vitalik"],
+      "subreddits": ["ethereum", "cryptocurrency"],
+      "base_price": 3500.0
+    },
+    {
+      "symbol": "TSLA",
+      "name": "Tesla",
+      "type": "stock",
+      "keywords": ["tesla", "tsla", "elon", "musk"],
+      "subreddits": ["teslainvestorsclub", "stocks", "wallstreetbets"],
+      "base_price": 240.0
+    },
+    {
+      "symbol": "NVDA",
+      "name": "NVIDIA",
+      "type": "stock",
+      "keywords": ["nvidia", "nvda", "ai", "gpu"],
+      "subreddits": ["nvidia", "stocks", "wallstreetbets"],
+      "base_price": 880.0
+    },
+    {
+      "symbol": "GME",
+      "name": "GameStop",
+      "type": "stock",
+      "keywords": ["gme", "gamestop", "deepfuckingvalue", "roaringkitty"],
+      "subreddits": ["wallstreetbets", "gme", "superstonk"],
+      "base_price": 25.0
+    },
+    {
+      "symbol": "AMC",
+      "name": "AMC Entertainment",
+      "type": "stock",
+      "keywords": ["amc", "aron", "cinema"],
+      "subreddits": ["wallstreetbets", "amcstock"],
+      "base_price": 4.5
+    }
+  ],
+  "telegram_channels": [
+    "Bitcoin",
+    "ethereum",
+    "WhaleTrades",
+    "CryptoCurrency",
+    "WallStreetBetsReal"
+  ]
+}

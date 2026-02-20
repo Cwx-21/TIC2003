@@ -1,129 +1,176 @@
 # HypeCheck
 
-HypeCheck is a "Social Media Event & Data Processing System" that measures the correlation between social media "hype" and financial reality.
+HypeCheck is a **Social Media Event & Data Processing System** that measures the correlation between social media "hype" and financial reality. It analyzes sentiment from Reddit (historical backtesting) and Telegram (live monitoring) against asset prices to detect divergence, manipulation patterns, and FOMO-driven rallies.
 
 ## Project Structure
 
-This is a monorepo containing:
+```
+TIC2003/
+├── apps/
+│   ├── web/          # React + Vite Frontend (Dashboard)
+│   ├── api/          # Node.js + Express Backend (REST API)
+│   └── etl/          # Python ETL Pipeline (Sentiment + Price Ingestion)
+├── docker-compose.yml
+├── PROJECT.MD        # Project specification & architecture
+└── ETL_DB_SCHEMA.md  # Database schema documentation
+```
 
-- **apps/web**: React + Vite Frontend
-- **apps/api**: Node.js + Express Backend
-- **apps/etl**: Python Data Ingestion Service
+## Architecture
 
-## Getting Started
+| Layer            | Tech                              | Role                                                |
+| :--------------- | :-------------------------------- | :-------------------------------------------------- |
+| **ETL Pipeline** | Python 3, VADER, Telethon, Pandas | Ingests social data, runs NLP, writes to PostgreSQL |
+| **Database**     | PostgreSQL 15                     | Central data warehouse (10 tables, 15 indexes)      |
+| **Backend API**  | Node.js, Express, Sequelize       | REST API serving processed data to frontend         |
+| **Frontend**     | React, Vite, Tailwind CSS         | Interactive dual-axis charts (Price vs. Sentiment)  |
 
-You can run the project using **Docker** (recommended for backend/DB) or **Locally** (via npm).
+### Database Schema (10 Tables)
 
-### Option 1: Docker
+| Category              | Tables                                                                                  |
+| :-------------------- | :-------------------------------------------------------------------------------------- |
+| **Core Data**         | `assets`, `sentiment_logs`, `price_history`, `historical_prices`                        |
+| **Session Tracking**  | `backtest_runs`, `live_sessions`                                                        |
+| **Analysis & Output** | `author_credibility`, `sentiment_aggregations`, `sentiment_price_correlation`, `alerts` |
 
-This method spins up the PostgreSQL Database, Node.js API, and Python ETL service in containers.
+> See [ETL_DB_SCHEMA.md](ETL_DB_SCHEMA.md) for full schema documentation.
 
-1.  **Start Backend Services:**
+### ETL Modes
 
-    ```bash
-    npm run docker:up
-    ```
-
-    _This runs `docker-compose up --build`._
-
-2.  **Start Frontend (Locally):**
-    Open a new terminal and run:
-
-    ```bash
-    npm run setup:web  # One-time setup
-    npm run dev:web
-    ```
-
-    The frontend will be available at `http://localhost:5173`.
-
-3.  **Stop Services:**
-    ```bash
-    npm run docker:down
-    ```
+| Mode         | Data Source                      | Price Source                         | Command                                      |
+| :----------- | :------------------------------- | :----------------------------------- | :------------------------------------------- |
+| **Backtest** | Reddit CSV (Kaggle/Pushshift)    | CoinGecko Historical / Yahoo Finance | `npm run dev:etl -- --mode backtest --clear` |
+| **Live**     | Telegram channels (via Telethon) | CoinGecko real-time API              | `npm run dev:etl`                            |
 
 ---
 
-### Option 2: Local Development (No Docker)
+## Getting Started
 
-If you do not have Docker or prefer running everything on your machine directly.
+### Prerequisites
 
-#### Prerequisites
-
-- Node.js (v18+)
-- Python (v3.9+)
-- PostgreSQL installed and running locally.
+- **Node.js** v18+
+- **Python** 3.9+
+- **Docker** (for PostgreSQL) or a local PostgreSQL 15 installation
 
 <details>
 <summary><strong>Python & PostgreSQL Installation Guide</strong></summary>
 
 **For Windows:**
 
-1.  **Python:** Download the installer from python.org. **Important:** Check "Add Python to PATH" during installation.
-2.  **PostgreSQL:** Download the installer from postgresql.org. Remember the password you set for the `postgres` user.
-3.  **Verify:** Open PowerShell and run `python --version` and `psql --version`.
+1. **Python:** Download from python.org. **Important:** Check "Add Python to PATH" during install.
+2. **PostgreSQL:** Download from postgresql.org. Remember the password you set for `postgres`.
+3. **Verify:** Open PowerShell → `python --version` and `psql --version`.
 
 **For macOS:**
 
-1.  **Python:** MacOS comes with Python, but it's best to use Homebrew: `brew install python`.
-2.  **PostgreSQL:** Use Homebrew: `brew install postgresql@15` then `brew services start postgresql@15`.
-3.  **Verify:** Run `python3 --version` and `psql --version` in Terminal.
+1. **Python:** `brew install python`
+2. **PostgreSQL:** `brew install postgresql@15` then `brew services start postgresql@15`
+3. **Verify:** `python3 --version` and `psql --version`
 </details>
 
-#### 1. Database Setup
+---
 
-Ensure your local PostgreSQL is running. Create a database named `hypecheck`.
-Update `apps/api/.env` to point to your local DB if needed:
+### Quick Start (Recommended)
 
-```env
-DATABASE_URL=postgres://YOUR_USER:YOUR_PASSWORD@localhost:5432/hypecheck
+**Step 1: Start PostgreSQL via Docker**
+
+```bash
+npm run docker:up
 ```
 
-#### 2. Install Dependencies
+> This starts PostgreSQL on `localhost:5432` (user: `user`, password: `password`, database: `hypecheck`).
 
-Run these commands once to set up all services:
+**Step 2: Install All Dependencies**
 
 ```bash
 npm install           # Root dependencies
 npm run setup:api     # Backend dependencies
 npm run setup:web     # Frontend dependencies
-npm run setup:etl     # Python dependencies
+npm run setup:etl     # Creates Python venv & installs packages
 ```
 
-#### 3. Run Services
+**Step 3: Configure Environment Variables**
 
-You will need **3 separate terminal windows**:
+Create `apps/etl/.env`:
 
-**Terminal 1 (API):**
+```env
+DATABASE_URL=postgres://user:password@localhost:5432/hypecheck
+
+# Required only for Live Mode (Telegram)
+TELEGRAM_API_ID=your_id
+TELEGRAM_API_HASH=your_hash
+```
+
+**Step 4: Download Backtest Data**
+
+Download the [WallStreetBets 2022 Dataset](https://www.kaggle.com/datasets/gpreda/wallstreetbets-2022) from Kaggle and place it in:
+
+```
+apps/etl/data/wallstreetbets_2022.csv
+```
+
+> The `data/` directory is gitignored — each team member must download the CSV separately (~221 MB).
+
+**Step 5: Run Services (3 terminals)**
 
 ```bash
-npm run dev:api
-# Runs on http://localhost:3000
+# Terminal 1 — Backend API
+npm run dev:api            # → http://localhost:3000
+
+# Terminal 2 — Frontend Dashboard
+npm run dev:web            # → http://localhost:5173
+
+# Terminal 3 — ETL Pipeline (pick one)
+npm run dev:etl -- --mode backtest --clear   # Backtest mode (Reddit CSV)
+npm run dev:etl                              # Live mode (Telegram)
 ```
 
-**Terminal 2 (Frontend):**
+#### What `--mode backtest --clear` Does
 
-```bash
-npm run dev:web
-# Runs on http://localhost:5173
-```
+1. Initializes the database schema (10 tables, 15 indexes, creates if not exist)
+2. Truncates all data tables (fresh start)
+3. Seeds the `assets` table from `config/assets.json`
+4. Creates a `backtest_runs` record with status tracking
+5. Processes ~1.1M CSV rows through VADER sentiment analysis
+6. Batch-inserts relevant records (500 rows/batch) into `sentiment_logs`
+7. Upserts author credibility scores into `author_credibility`
+8. Marks the backtest run as `completed` with final counts
 
-**Terminal 3 (ETL Service):**
+---
 
-```bash
-npm run dev:etl
-```
+### Without Docker (Local PostgreSQL)
+
+1. Ensure PostgreSQL is running locally
+2. Create the database: `CREATE DATABASE hypecheck;`
+3. Update `apps/etl/.env` with your local PostgreSQL credentials
+4. Follow Steps 2–5 above
+
+---
 
 ## Scripts Reference
 
 All scripts are run from the **root** directory:
 
-| Command               | Description                                  |
-| :-------------------- | :------------------------------------------- |
-| `npm run docker:up`   | Builds and starts DB, API, and ETL in Docker |
-| `npm run docker:down` | Stops and removes Docker containers          |
-| `npm run dev:web`     | Starts the React frontend locally            |
-| `npm run dev:api`     | Starts the Express backend locally           |
-| `npm run dev:etl`     | Starts the Python ETL script locally         |
-| `npm run setup:web`   | Installs frontend dependencies               |
-| `npm run setup:api`   | Installs backend dependencies                |
-| `npm run setup:etl`   | Installs Python requirements                 |
+| Command                                      | Description                                           |
+| :------------------------------------------- | :---------------------------------------------------- |
+| `npm run docker:up`                          | Starts PostgreSQL, API, and ETL in Docker containers  |
+| `npm run docker:down`                        | Stops and removes Docker containers                   |
+| `npm run dev:web`                            | Starts the React frontend (port 5173)                 |
+| `npm run dev:api`                            | Starts the Express API (port 3000)                    |
+| `npm run dev:etl`                            | Starts the ETL in **Live Mode** (Telegram)            |
+| `npm run dev:etl -- --mode backtest --clear` | Starts the ETL in **Backtest Mode** (clears DB first) |
+| `npm run setup:web`                          | Installs frontend dependencies                        |
+| `npm run setup:api`                          | Installs backend dependencies                         |
+| `npm run setup:etl`                          | Creates Python venv and installs requirements         |
+
+## Tracked Assets
+
+Configured in `apps/etl/config/assets.json`:
+
+| Symbol | Name              | Type   | Keywords                        |
+| :----- | :---------------- | :----- | :------------------------------ |
+| BTC    | Bitcoin           | Crypto | bitcoin, btc, satoshi           |
+| ETH    | Ethereum          | Crypto | ethereum, eth, vitalik          |
+| TSLA   | Tesla             | Stock  | tesla, tsla, elon, musk         |
+| NVDA   | NVIDIA            | Stock  | nvidia, nvda, ai, gpu           |
+| GME    | GameStop          | Stock  | gme, gamestop, deepfuckingvalue |
+| AMC    | AMC Entertainment | Stock  | amc, aron, cinema               |
