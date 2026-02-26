@@ -7,12 +7,12 @@
   "scripts": {
     "dev:web": "npm run dev --prefix apps/web",
     "dev:api": "npm run dev --prefix apps/api",
-    "dev:etl": "python3 apps/etl/main.py",
+    "dev:etl": "apps/etl/venv/bin/python apps/etl/main.py",
     "docker:up": "docker-compose up --build",
     "docker:down": "docker-compose down",
     "setup:api": "cd apps/api && npm install",
     "setup:web": "cd apps/web && npm install",
-    "setup:etl": "pip3 install -r apps/etl/requirements.txt"
+    "setup:etl": "python3 -m venv apps/etl/venv && apps/etl/venv/bin/pip install -r apps/etl/requirements.txt"
   },
   "keywords": [],
   "author": "",

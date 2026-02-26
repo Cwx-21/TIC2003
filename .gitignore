@@ -138,5 +138,20 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-# Postgres Data 
+# Postgres Data
 postgres-data
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+apps/etl/venv/
+
+# ETL backtest data (large CSV files — download separately)
+apps/etl/data/
+
+# Telegram session files
+*.session
+
+# macOS
+.DS_Store
