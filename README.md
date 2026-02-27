@@ -36,10 +36,10 @@ TIC2003/
 
 ### ETL Modes
 
-| Mode         | Data Source                      | Price Source                         | Command                                      |
-| :----------- | :------------------------------- | :----------------------------------- | :------------------------------------------- |
-| **Backtest** | Reddit CSV (Kaggle/Pushshift)    | CoinGecko Historical / Yahoo Finance | `npm run dev:etl -- --mode backtest --clear` |
-| **Live**     | Telegram channels (via Telethon) | CoinGecko real-time API              | `npm run dev:etl`                            |
+| Mode         | Data Source                      | Price Source             | Command                                      |
+| :----------- | :------------------------------- | :----------------------- | :------------------------------------------- |
+| **Backtest** | Reddit CSV (Kaggle/Pushshift)    | Yahoo Finance (yfinance) | `npm run dev:etl -- --mode backtest --clear` |
+| **Live**     | Telegram channels (via Telethon) | Yahoo Finance (yfinance) | `npm run dev:etl`                            |
 
 ---
 

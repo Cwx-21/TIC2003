@@ -81,6 +81,8 @@ class BacktestRunner:
         processed_count = 0
         error_count = 0
         batch_buffer = []
+        min_date = None
+        max_date = None
         
         for index, row in df.iterrows():
             try:
@@ -100,6 +102,13 @@ class BacktestRunner:
                     timestamp = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
                 except ValueError:
                     continue
+                
+                # Track date range for historical price ingestion
+                ts_date = timestamp.date()
+                if min_date is None or ts_date < min_date:
+                    min_date = ts_date
+                if max_date is None or ts_date > max_date:
+                    max_date = ts_date
                 
                 # VADER Analysis
                 score = self.analyzer.polarity_scores(content)['compound']
@@ -158,10 +167,37 @@ class BacktestRunner:
         
         # Mark backtest as completed
         update_backtest_progress(backtest_id, processed_count, error_count)
-        complete_backtest_run(backtest_id, status='completed')
         
-        print(f"Backtest Complete! Processed {processed_count} relevant posts ({error_count} errors).")
+        print(f"\nCSV Processing Complete! {processed_count} relevant posts ({error_count} errors).")
+        print(f"Date range detected: {min_date} → {max_date}")
+
+        # =====================================================================
+        # Phase 1 Post-Processing Pipeline
+        # =====================================================================
+
+        # Step 1: Ingest historical prices for the backtest date range
+        print("\n[Phase 1 - Step 1/3] Historical Price Ingestion...")
+        from historical_price_ingest import ingest_historical_prices
+        date_range = (str(min_date), str(max_date)) if min_date and max_date else None
+        ingest_historical_prices(date_range=date_range)
+
+        # Step 2: Aggregate sentiment into time buckets
+        print("\n[Phase 1 - Step 2/3] Sentiment Aggregation...")
+        from aggregation_engine import SentimentAggregator
+        SentimentAggregator().run(backtest_id)
+
+        # Step 3: Compute correlation & generate alerts
+        print("\n[Phase 1 - Step 3/3] Correlation & Divergence Analysis...")
+        from correlation_engine import CorrelationEngine
+        CorrelationEngine().run(backtest_id)
+
+        # Mark as fully completed
+        complete_backtest_run(backtest_id, status='completed')
+        print(f"\n{'='*60}")
+        print(f"Backtest Pipeline Complete! (Run ID: {backtest_id})")
+        print(f"{'='*60}")
 
 if __name__ == "__main__":
     runner = BacktestRunner()
     runner.run()
+

@@ -61,7 +61,6 @@ def init_db():
             symbol VARCHAR(20) PRIMARY KEY,
             name VARCHAR(100) NOT NULL,
             type VARCHAR(10) NOT NULL CHECK (type IN ('crypto', 'stock')),
-            coingecko_id VARCHAR(50),
             keywords JSONB DEFAULT '[]',
             subreddits JSONB DEFAULT '[]',
             is_active BOOLEAN DEFAULT TRUE,
@@ -261,8 +260,8 @@ def seed_assets(assets_config):
         for asset in assets_config:
             cur.execute(
                 """
-                INSERT INTO assets (symbol, name, type, coingecko_id, keywords, subreddits)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO assets (symbol, name, type, keywords, subreddits)
+                VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (symbol) DO UPDATE SET
                     name = EXCLUDED.name,
                     keywords = EXCLUDED.keywords,
@@ -272,7 +271,6 @@ def seed_assets(assets_config):
                     asset['symbol'],
                     asset['name'],
                     asset['type'],
-                    asset.get('coingecko_id'),
                     Json(asset.get('keywords', [])),
                     Json(asset.get('subreddits', []))
                 )
@@ -524,6 +522,247 @@ def upsert_author_credibility(author_id, source, credibility_score, is_spam=Fals
         conn.commit()
     except Exception as e:
         print(f"Error upserting author credibility: {e}")
+        conn.rollback()
+    finally:
+        release_connection(conn)
+
+# ---------------------------------------------------------------------------
+# Asset Queries
+# ---------------------------------------------------------------------------
+def fetch_active_assets():
+    """Fetches all active assets from the DB. Returns list of dicts."""
+    conn = get_db_connection()
+    if not conn: return []
+
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT symbol, name, type, keywords FROM assets WHERE is_active = TRUE")
+        columns = [desc[0] for desc in cur.description]
+        rows = cur.fetchall()
+        return [dict(zip(columns, row)) for row in rows]
+    except Exception as e:
+        print(f"Error fetching assets: {e}")
+        return []
+    finally:
+        release_connection(conn)
+
+# ---------------------------------------------------------------------------
+# Historical Price Inserts
+# ---------------------------------------------------------------------------
+def insert_historical_prices_batch(records):
+    """
+    Batch-inserts historical OHLCV price records.
+    records: list of tuples (asset_symbol, price_open, price_close, price_high, price_low, volume, event_date, source)
+    Uses ON CONFLICT to safely handle re-runs.
+    """
+    if not records:
+        return 0
+
+    conn = get_db_connection()
+    if not conn: return 0
+
+    try:
+        cur = conn.cursor()
+        execute_values(
+            cur,
+            """
+            INSERT INTO historical_prices
+            (asset_symbol, price_open, price_close, price_high, price_low, volume, event_date, source)
+            VALUES %s
+            ON CONFLICT (asset_symbol, event_date) DO NOTHING
+            """,
+            records,
+            page_size=500
+        )
+        inserted = cur.rowcount
+        conn.commit()
+        return inserted
+    except Exception as e:
+        print(f"Error batch-inserting historical prices: {e}")
+        conn.rollback()
+        return 0
+    finally:
+        release_connection(conn)
+
+# ---------------------------------------------------------------------------
+# Sentiment Log Queries (for aggregation)
+# ---------------------------------------------------------------------------
+def fetch_sentiment_logs_for_backtest(backtest_id):
+    """
+    Fetches sentiment logs for a given backtest run.
+    Returns list of dicts with keys: asset_symbol, sentiment_score, credibility_score, event_timestamp.
+    """
+    conn = get_db_connection()
+    if not conn: return []
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT asset_symbol, sentiment_score, credibility_score, event_timestamp
+            FROM sentiment_logs
+            WHERE backtest_id = %s
+            ORDER BY event_timestamp
+            """,
+            (backtest_id,)
+        )
+        columns = [desc[0] for desc in cur.description]
+        rows = cur.fetchall()
+        return [dict(zip(columns, row)) for row in rows]
+    except Exception as e:
+        print(f"Error fetching sentiment logs: {e}")
+        return []
+    finally:
+        release_connection(conn)
+
+# ---------------------------------------------------------------------------
+# Aggregation Inserts & Queries
+# ---------------------------------------------------------------------------
+def insert_aggregations_batch(records):
+    """
+    Batch-inserts sentiment aggregation records.
+    records: list of tuples (asset_symbol, time_bucket, bucket_interval, avg_sentiment_score, weighted_avg_sentiment, message_volume, backtest_id, session_id)
+    """
+    if not records:
+        return
+
+    conn = get_db_connection()
+    if not conn: return
+
+    try:
+        cur = conn.cursor()
+        execute_values(
+            cur,
+            """
+            INSERT INTO sentiment_aggregations
+            (asset_symbol, time_bucket, bucket_interval, avg_sentiment_score, weighted_avg_sentiment, message_volume, backtest_id, session_id)
+            VALUES %s
+            """,
+            records,
+            page_size=500
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Error batch-inserting aggregations: {e}")
+        conn.rollback()
+    finally:
+        release_connection(conn)
+
+def fetch_aggregations_for_backtest(backtest_id, interval='1d'):
+    """
+    Fetches sentiment aggregations for a given backtest and interval.
+    Returns list of dicts.
+    """
+    conn = get_db_connection()
+    if not conn: return []
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT asset_symbol, time_bucket, avg_sentiment_score, weighted_avg_sentiment, message_volume
+            FROM sentiment_aggregations
+            WHERE backtest_id = %s AND bucket_interval = %s
+            ORDER BY asset_symbol, time_bucket
+            """,
+            (backtest_id, interval)
+        )
+        columns = [desc[0] for desc in cur.description]
+        rows = cur.fetchall()
+        return [dict(zip(columns, row)) for row in rows]
+    except Exception as e:
+        print(f"Error fetching aggregations: {e}")
+        return []
+    finally:
+        release_connection(conn)
+
+# ---------------------------------------------------------------------------
+# Historical Price Queries (for correlation)
+# ---------------------------------------------------------------------------
+def fetch_historical_prices_for_asset(symbol, start_date, end_date):
+    """
+    Fetches historical prices for an asset within a date range.
+    Returns list of dicts with keys: event_date, price_open, price_close, price_high, price_low, volume.
+    """
+    conn = get_db_connection()
+    if not conn: return []
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT event_date, price_open, price_close, price_high, price_low, volume
+            FROM historical_prices
+            WHERE asset_symbol = %s AND event_date BETWEEN %s AND %s
+            ORDER BY event_date
+            """,
+            (symbol, start_date, end_date)
+        )
+        columns = [desc[0] for desc in cur.description]
+        rows = cur.fetchall()
+        return [dict(zip(columns, row)) for row in rows]
+    except Exception as e:
+        print(f"Error fetching historical prices: {e}")
+        return []
+    finally:
+        release_connection(conn)
+
+# ---------------------------------------------------------------------------
+# Correlation Inserts
+# ---------------------------------------------------------------------------
+def insert_correlations_batch(records):
+    """
+    Batch-inserts correlation records.
+    records: list of tuples (asset_symbol, time_bucket, bucket_interval, avg_sentiment, weighted_sentiment,
+                             price_at_bucket, price_change_pct, sentiment_price_divergence, message_volume, backtest_id, session_id)
+    """
+    if not records:
+        return
+
+    conn = get_db_connection()
+    if not conn: return
+
+    try:
+        cur = conn.cursor()
+        execute_values(
+            cur,
+            """
+            INSERT INTO sentiment_price_correlation
+            (asset_symbol, time_bucket, bucket_interval, avg_sentiment, weighted_sentiment,
+             price_at_bucket, price_change_pct, sentiment_price_divergence, message_volume, backtest_id, session_id)
+            VALUES %s
+            """,
+            records,
+            page_size=500
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Error batch-inserting correlations: {e}")
+        conn.rollback()
+    finally:
+        release_connection(conn)
+
+# ---------------------------------------------------------------------------
+# Alert Inserts
+# ---------------------------------------------------------------------------
+def insert_alert(asset_symbol, alert_type, severity, message, details, event_timestamp, backtest_id=None, session_id=None):
+    """Inserts a single alert record."""
+    conn = get_db_connection()
+    if not conn: return
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO alerts
+            (asset_symbol, alert_type, severity, message, details, event_timestamp, backtest_id, session_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (asset_symbol, alert_type, severity, message, Json(details), event_timestamp, backtest_id, session_id)
+        )
+        conn.commit()
+    except Exception as e:
+        print(f"Error inserting alert: {e}")
         conn.rollback()
     finally:
         release_connection(conn)
