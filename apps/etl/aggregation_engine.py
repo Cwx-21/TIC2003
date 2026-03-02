@@ -96,10 +96,10 @@ class SentimentAggregator:
                     #          weighted_avg_sentiment, message_volume, backtest_id, session_id)
                     batch_records.append((
                         symbol,
-                        bucket_time,
+                        bucket_time.to_pydatetime(),
                         interval_label,
-                        round(avg_sentiment, 6),
-                        round(weighted_avg, 6),
+                        float(round(avg_sentiment, 6)),
+                        float(round(weighted_avg, 6)),
                         msg_count,
                         backtest_id,
                         None  # session_id (backtest mode)
