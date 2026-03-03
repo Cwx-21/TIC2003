@@ -103,13 +103,4 @@ Sentiments_Logs.belongsTo(Live_Sessions, {
   as: "Live_Sessions",
 });
 
-Author.hasMany(Sentiments_Logs, {
-  foreignKey: "author_id",
-  as: "Sentiments_Logs",
-});
-Sentiments_Logs.belongsTo(Author, {
-  foreignKey: "author_id",
-  as: "Author",
-});
-
 export default Sentiments_Logs;

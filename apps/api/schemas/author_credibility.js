@@ -12,7 +12,7 @@ const Author_Credibility = db.define(
     },
     source: {
       type: DataTypes.STRING(20),
-      // primaryKey: true,
+      primaryKey: true,
       allowNull: false,
     },
     baseline_credibility: {
