@@ -64,10 +64,6 @@ const Sentiments_Logs = db.define(
     author_id: {
       type: DataTypes.INTEGER,
       allowNull: false,
-      references: {
-        model: Author,
-        key: "author_id",
-      },
     },
   },
   {
