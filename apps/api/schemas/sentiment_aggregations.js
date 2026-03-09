@@ -61,6 +61,12 @@ const Sentiment_Aggregations = db.define(
   {
     timestamps: true,
     freezeTableName: true,
+    indexes: [
+      {
+        unique: true,
+        fields: ["asset_symbol", "bucket_interval", "time_bucket"],
+      },
+    ],
   },
 );
 

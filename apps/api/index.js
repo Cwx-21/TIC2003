@@ -12,19 +12,103 @@ import Price_History from "./schemas/price_history.js";
 import Sentiment_Aggregations from "./schemas/sentiment_aggregations.js";
 import Sentiment_Logs from "./schemas/sentiment_logs.js";
 import Sentiment_Price_Correlation from "./schemas/sentiment_price_correlation.js";
+import { Op } from "sequelize";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const onFirstLoad = false;
-
 app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => {
   res.json({ message: "HypeCheck API is running" });
+});
+
+//Latest sentiment aggregations
+app.get("/sentiment_aggregations/:asset_symbol/latest", async (req, res) => {
+  const asset_symbol = req.params.asset_symbol;
+
+  const results = await Sentiment_Aggregations.findAll({
+    where: {
+      asset_symbol,
+    },
+    order: [["time_bucket", "DESC"]],
+    attributes: [
+      "asset_symbol",
+      "time_bucket",
+      "bucket_interval",
+      "avg_sentiment_score",
+      "weighted_avg_sentiment",
+      "message_volume",
+    ],
+  });
+
+  if (!results || results.length == 0)
+    return res.status(200).json({ message: "No data" });
+
+  return res.status(200).json({ message: results });
+});
+
+//Latest price
+app.get("/historical_price/:asset_symbol/latest", async (req, res) => {
+  const asset_symbol = req.params.asset_symbol;
+
+  if (!asset_symbol) return res.status(400).json({ message: "Missing Fields" });
+
+  const results = await Historical_Prices.findAll({
+    where: {
+      asset_symbol,
+    },
+    order: [["event_date", "ASC"]],
+    attributes: [
+      "asset_symbol",
+      "event_date",
+      "price_open",
+      "price_high",
+      "price_low",
+      "price_close",
+      "volume",
+      "source",
+    ],
+  });
+
+  if (!results || results.length == 0)
+    return res.status(200).json({ message: "No data for " + asset_symbol });
+
+  return res.status(200).json({ message: results });
+});
+
+//Price range from start date to end date
+app.get("/historical_price/:asset_symbol", async (req, res) => {
+  const asset_symbol = req.params.asset_symbol;
+  const { start_date, end_date } = req.body;
+
+  if (!asset_symbol) return res.status(400).json({ message: "Missing Fields" });
+
+  const results = await Historical_Prices.findAll({
+    where: {
+      asset_symbol,
+      event_date: { [Op.between]: [start_date, end_date] },
+    },
+    order: [["event_date", "ASC"]],
+    attributes: [
+      "asset_symbol",
+      "event_date",
+      "price_open",
+      "price_high",
+      "price_low",
+      "price_close",
+      "volume",
+      "source",
+    ],
+  });
+
+  if (!results)
+    return res.status(400).json({ message: "No data for " + asset_symbol });
+
+  return res.status(200).json({ message: results });
 });
 
 app.listen(PORT, async (err) => {
@@ -34,21 +118,12 @@ app.listen(PORT, async (err) => {
     console.log(`Server is Listening on: http://localhost:${PORT}/`);
 
     await db
-      .sync({ force: onFirstLoad })
+      .sync()
       .then(async () => {
         console.log("Connection to PostgreSQL is successful");
       })
       .catch((error) => {
         console.log(`Failed to connect to PostgreSQL: ${error}`);
       });
-
-    if (onFirstLoad) {
-      try {
-        const { LoadData } = require("./database/loadData.js");
-        await LoadData();
-      } catch (err) {
-        console.log(err);
-      }
-    }
   }
 });
