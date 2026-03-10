@@ -9,3 +9,4 @@ pandas
 yfinance
 numpy
 pytest
+pytest-asyncio

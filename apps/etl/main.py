@@ -3,7 +3,7 @@ import asyncio
 import time
 import os
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from dotenv import load_dotenv
 
 # Load env vars from .env file (if exists)
@@ -15,6 +15,7 @@ from db import (
     close_pool
 )
 from price_fetcher import get_live_price
+from live_engine import LiveProcessor
 
 def load_config():
     """Loads assets from the JSON config."""
@@ -86,7 +87,7 @@ def run_live_mode():
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     
-    # Schedule both tasks
+    # Schedule both task listeners
     loop.create_task(monitor.start())
     loop.create_task(price_loop(session_id=session_id))
     
@@ -97,7 +98,26 @@ def run_live_mode():
             if session_id and monitor.message_count > 0:
                 update_live_session_count(session_id, monitor.message_count)
     
+    # Periodically run the live aggregation processor
+    async def live_aggregation_loop():
+        if not session_id:
+            return
+            
+        processor = LiveProcessor(session_id)
+        while True:
+            # Wake up every 60 seconds
+            await asyncio.sleep(60)
+            
+            end_time = datetime.now(timezone.utc)
+            start_time = end_time - timedelta(seconds=60)
+            
+            try:
+                await processor.process_window(start_time, end_time)
+            except Exception as e:
+                print(f"Error in Live Aggregation Loop: {e}")
+
     loop.create_task(session_counter())
+    loop.create_task(live_aggregation_loop())
     
     try:
         loop.run_forever()
