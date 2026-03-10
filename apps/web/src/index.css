@@ -6,7 +6,7 @@
 
 body {
   background-color: #424242;
-  font-family: Arial, sans-serif;
+  font-family: 'Inter', sans-serif;
 }
 
 .page-container {
@@ -38,14 +38,46 @@ body {
   border-radius: 10px;
   border: 1px solid #ddd;
   font-size: 14px;
+  font-family: 'Inter', sans-serif;
 }
 
 .list-item {
-  padding: 12px 0;
+	padding: 14px 16px;
+  border-radius: 12px;
   text-align: left;
-  border-top: 1px solid #eee;
+	cursor: pointer;
+	transition: all 0.2s ease;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .list-item:first-child {
   border-top: none;
+}
+
+.list-item:hover {
+	background-color: #b8b7c7;
+  transform: translateY(-2px);
+}
+
+.back-button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  padding: 6px 12px;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	background-color: #e5e7eb;
+	transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.back-button:hover {
+	background-color: #b8b7c7;
+}
+
+.chart-header {
+	position: relative;
+	text-align: center;
+	margin-bottom: 16px;
 }

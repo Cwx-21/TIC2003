@@ -1,32 +1,61 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
 import SearchBar from "./components/SearchBar";
 import SectionCard from "./components/SectionCard";
+import Chart from "./components/Chart";
+import { stockData } from "./data/mockData";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [selectedBacktest, setSelectedBacktest] = useState(null);
+
+  const stockList = Object.keys(stockData);
 
   return (
     <div className="page-container">
-      {/*Stock/Coin Search*/}
-      <SearchBar placeholder="Search stock/coin..." />
+      {selectedStock === null ? (
+      <>
+        {/*Stock/Coin Search*/}
+        <SearchBar placeholder="Search stock/coin..." />
       
-      {/* Trending Section */}
-      <SectionCard
-        title="Trending"
-        items={["TSLA", "DOGE", "ASML", "NVDA"]}
-      />
+        {/* Trending Section */}
+        <SectionCard
+          title="Trending"
+          items={stockList}
+          onItemClick={setSelectedStock}
+        /> 
+      </>
+      ) : (
+        <>
+          <Chart
+              stockName={selectedStock}
+              onBack={() => setSelectedStock(null)}
+          /> 
+        </>
+      )}
 
-      {/*Historical Backtest Search*/}
+      {selectedBacktest === null ? (
+      <>
+        {/*Historical Backtest Search*/}
       <SearchBar placeholder="Search historical backtests..." />
       
-      {/* Trending Section */}
-      <SectionCard
-        title="Infamous historical backtests"
-        items={["GameStop 2021", "Elon Musk tweets vs TSLA"]}
-      />
+        {/* Trending Section */}
+        <SectionCard
+          title="Infamous historical backtests"
+          items={["GameStop 2021", "Elon Musk tweets vs TSLA"]}
+          onItemClick={setSelectedBacktest}
+        />
+      </>
+      ) : (
+        <>
+          <Chart
+              stockName={selectedBacktest}
+              onBack={() => setSelectedBacktest(null)}
+          /> 
+        </>
+      )}
+
+      
     </div>
   )
 }

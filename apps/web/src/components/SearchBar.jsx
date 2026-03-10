@@ -1,4 +1,6 @@
 function SearchBar({ placeholder }) {
+
+    
     return (
         <div className="card">
             <input
