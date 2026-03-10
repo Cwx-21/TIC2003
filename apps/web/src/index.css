@@ -1,68 +1,83 @@
-:root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 body {
-  margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  background-color: #424242;
+  font-family: 'Inter', sans-serif;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.page-container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  display:flex;
+  flex-direction: column;
+  gap: 30px;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+.card{
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow:0 4px 10px rgba(0,0,0,0.5);
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.card-title {
+  font-size: 16px;
+  font-weight: bold;
+  margin-bottom: 15px;
+  color: #555;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid #ddd;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+}
+
+.list-item {
+	padding: 14px 16px;
+  border-radius: 12px;
+  text-align: left;
+	cursor: pointer;
+	transition: all 0.2s ease;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.list-item:first-child {
+  border-top: none;
+}
+
+.list-item:hover {
+	background-color: #b8b7c7;
+  transform: translateY(-2px);
+}
+
+.back-button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  padding: 6px 12px;
+	border-radius: 8px;
+	border: none;
+	cursor: pointer;
+	background-color: #e5e7eb;
+	transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+}
+
+.back-button:hover {
+	background-color: #b8b7c7;
+}
+
+.chart-header {
+	position: relative;
+	text-align: center;
+	margin-bottom: 16px;
 }

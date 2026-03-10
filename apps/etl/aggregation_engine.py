@@ -100,7 +100,7 @@ class SentimentAggregator:
                         interval_label,
                         float(round(avg_sentiment, 6)),
                         float(round(weighted_avg, 6)),
-                        msg_count,
+                        int(msg_count),
                         backtest_id,
                         None  # session_id (backtest mode)
                     ))
