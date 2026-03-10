@@ -98,9 +98,9 @@ class SentimentAggregator:
                         symbol,
                         bucket_time,
                         interval_label,
-                        round(avg_sentiment, 6),
-                        round(weighted_avg, 6),
-                        msg_count,
+                        float(round(avg_sentiment, 6)),
+                        float(round(weighted_avg, 6)),
+                        int(msg_count),
                         backtest_id,
                         None  # session_id (backtest mode)
                     ))
