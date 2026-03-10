@@ -40,6 +40,7 @@ const Author_Credibility = db.define(
     },
   },
   {
+    timestamps: false,
     freezeTableName: true,
   },
 );

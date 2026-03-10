@@ -48,6 +48,7 @@ const Live_Sessions = db.define(
     },
   },
   {
+    timestamps: false,
     freezeTableName: true,
   },
 );

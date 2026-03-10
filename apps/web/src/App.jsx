@@ -1,34 +1,62 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
 import './App.css'
+import SearchBar from "./components/SearchBar";
+import SectionCard from "./components/SectionCard";
+import Chart from "./components/Chart";
+import { stockData } from "./data/mockData";
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [selectedStock, setSelectedStock] = useState(null);
+  const [selectedBacktest, setSelectedBacktest] = useState(null);
+
+  const stockList = Object.keys(stockData);
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <div className="page-container">
+      {selectedStock === null ? (
+      <>
+        {/*Stock/Coin Search*/}
+        <SearchBar placeholder="Search stock/coin..." />
+      
+        {/* Trending Section */}
+        <SectionCard
+          title="Trending"
+          items={stockList}
+          onItemClick={setSelectedStock}
+        /> 
+      </>
+      ) : (
+        <>
+          <Chart
+              stockName={selectedStock}
+              onBack={() => setSelectedStock(null)}
+          /> 
+        </>
+      )}
+
+      {selectedBacktest === null ? (
+      <>
+        {/*Historical Backtest Search*/}
+      <SearchBar placeholder="Search historical backtests..." />
+      
+        {/* Trending Section */}
+        <SectionCard
+          title="Infamous historical backtests"
+          items={["GameStop 2021", "Elon Musk tweets vs TSLA"]}
+          onItemClick={setSelectedBacktest}
+        />
+      </>
+      ) : (
+        <>
+          <Chart
+              stockName={selectedBacktest}
+              onBack={() => setSelectedBacktest(null)}
+          /> 
+        </>
+      )}
+
+      
+    </div>
   )
 }
 

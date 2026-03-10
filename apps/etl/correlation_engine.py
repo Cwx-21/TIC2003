@@ -117,11 +117,11 @@ class CorrelationEngine:
                     symbol,
                     row['time_bucket'],
                     interval,
-                    round(row['avg_sentiment_score'], 6) if pd.notna(row['avg_sentiment_score']) else 0,
-                    round(row['weighted_avg_sentiment'], 6) if pd.notna(row['weighted_avg_sentiment']) else 0,
-                    round(row['price_close'], 2) if pd.notna(row['price_close']) else 0,
-                    round(row['price_change_pct'], 4) if pd.notna(row['price_change_pct']) else 0,
-                    round(row['divergence'], 6) if pd.notna(row['divergence']) else 0,
+                    float(round(row['avg_sentiment_score'], 6)) if pd.notna(row['avg_sentiment_score']) else 0.0,
+                    float(round(row['weighted_avg_sentiment'], 6)) if pd.notna(row['weighted_avg_sentiment']) else 0.0,
+                    float(round(row['price_close'], 2)) if pd.notna(row['price_close']) else 0.0,
+                    float(round(row['price_change_pct'], 4)) if pd.notna(row['price_change_pct']) else 0.0,
+                    float(round(row['divergence'], 6)) if pd.notna(row['divergence']) else 0.0,
                     int(row['message_volume']) if pd.notna(row['message_volume']) else 0,
                     backtest_id,
                     None  # session_id
@@ -158,10 +158,10 @@ class CorrelationEngine:
                 severity=severity,
                 message=f"Sentiment-price divergence detected for {symbol}: {direction} (divergence={div_val:.3f})",
                 details={
-                    'divergence': round(div_val, 4),
-                    'weighted_sentiment': round(row['weighted_avg_sentiment'], 4),
-                    'price_change_pct': round(row['price_change_pct'], 4),
-                    'price_close': round(row['price_close'], 2),
+                    'divergence': float(round(div_val, 4)),
+                    'weighted_sentiment': float(round(row['weighted_avg_sentiment'], 4)),
+                    'price_change_pct': float(round(row['price_change_pct'], 4)),
+                    'price_close': float(round(row['price_close'], 2)),
                     'message_volume': int(row['message_volume'])
                 },
                 event_timestamp=row['time_bucket'],
@@ -182,8 +182,8 @@ class CorrelationEngine:
                     message=f"Message volume spike for {symbol}: {int(row['message_volume'])} messages (avg: {int(mean_volume)})",
                     details={
                         'message_volume': int(row['message_volume']),
-                        'mean_volume': round(mean_volume, 1),
-                        'spike_ratio': round(row['message_volume'] / mean_volume, 2)
+                        'mean_volume': float(round(mean_volume, 1)),
+                        'spike_ratio': float(round(row['message_volume'] / mean_volume, 2))
                     },
                     event_timestamp=row['time_bucket'],
                     backtest_id=backtest_id

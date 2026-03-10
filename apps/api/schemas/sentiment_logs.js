@@ -68,6 +68,8 @@ const Sentiments_Logs = db.define(
   },
   {
     timestamps: true,
+    underscored: true,
+    updatedAt: false,
     freezeTableName: true,
   },
 );
