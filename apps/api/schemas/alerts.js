@@ -74,6 +74,8 @@ const Alerts = db.define(
   },
   {
     timestamps: true,
+    underscored: true,
+    updatedAt: false,
     freezeTableName: true,
   },
 );

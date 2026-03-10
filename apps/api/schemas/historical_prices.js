@@ -56,7 +56,7 @@ const Historical_Prices = db.define(
     },
   },
   {
-    timestamps: true,
+    timestamps: false,
     freezeTableName: true,
     indexes: [
       {
