@@ -1,5 +1,4 @@
-function SearchBar({ placeholder }) {
-
+function SearchBar({ placeholder , searchTerm, setSearchTerm }) {
     
     return (
         <div className="card">
@@ -7,6 +6,8 @@ function SearchBar({ placeholder }) {
                 type="text"
                 placeholder={placeholder}
                 className="search-input"
+                value={searchTerm}
+			    onChange={(entry) => setSearchTerm(entry.target.value)}
             />
         </div>
     );

@@ -1,27 +1,28 @@
 import "chart.js/auto";
 import { Line } from "react-chartjs-2";
-import { stockData } from "../data/mockData";
 
-function Chart({ stockName, onBack }) {
+function Chart({ stock, onBack }) {
 
-    const currentStock = stockData[stockName];
-
-    const data = currentStock ? {
-        labels: currentStock.labels,
+    const data = stock ? {
+        labels: stock.labels,
         datasets: [
             {
                 label: "Price",
-                data: currentStock.price,
-                borderColor: "blue",
-                yAxisID: "priceAxis"
+                data: stock.price,
+				borderColor: "blue",
+				backgroundColor:"blue",
+				yAxisID: "priceAxis",
+				pointRadius: 0
             },
             {
                 label: "Sentiment",
-                data: currentStock.sentiment,
-                borderColor: "red",
-                yAxisID: "sentimentAxis"
-            }
-        ]
+                data: stock.sentiment,
+				borderColor: "green",
+				backgroundColor:"green",
+				yAxisID: "sentimentAxis",
+				pointRadius: 0
+            },
+        ],
     } : null;
 
     const options = {
@@ -34,6 +35,8 @@ function Chart({ stockName, onBack }) {
 			sentimentAxis: {
 				type: "linear",
 				position: "right",
+				min: -1,
+				max: 1,
 				grid: {
 					drawOnChartArea: false,
 				},
@@ -44,17 +47,11 @@ function Chart({ stockName, onBack }) {
     return (
 		<div className="card">
 			<div className="chart-header">
-				<h2>
-					{currentStock
-						? `Showing chart for ${stockName}`
-						: `No data found for ${stockName}`}
-				</h2>
-				<button className="back-button" onClick={onBack}>
-					Back
-				</button>
+				<h2> {stock ? `Showing chart for ${stock.symbol}` : `No data found for ${stock.name}`} </h2>
+				<button className="back-button" onClick={onBack}> Back </button>
 			</div>
 
-			{currentStock && <Line data={data} options={options} />}
+			{stock ? (<Line data={data} options={options} />) : <p>No data for this stock</p>}
 		</div>
 	);
 }

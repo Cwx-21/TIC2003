@@ -5,7 +5,7 @@ const Author_Credibility = db.define(
   "author_credibility",
   {
     author_id: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.STRING,
       primaryKey: true,
       autoIncrement: true,
       allowNull: false,
