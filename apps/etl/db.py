@@ -615,6 +615,33 @@ def fetch_sentiment_logs_for_backtest(backtest_id):
     finally:
         release_connection(conn)
 
+def fetch_sentiment_logs_for_window(session_id, start_time, end_time):
+    """
+    Fetches live sentiment logs for a specific time window within a given session.
+    """
+    conn = get_db_connection()
+    if not conn: return []
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT asset_symbol, sentiment_score, credibility_score, event_timestamp
+            FROM sentiment_logs
+            WHERE session_id = %s AND event_timestamp >= %s AND event_timestamp < %s
+            ORDER BY event_timestamp
+            """,
+            (session_id, start_time, end_time)
+        )
+        columns = [desc[0] for desc in cur.description]
+        rows = cur.fetchall()
+        return [dict(zip(columns, row)) for row in rows]
+    except Exception as e:
+        print(f"Error fetching sentiment logs for window: {e}")
+        return []
+    finally:
+        release_connection(conn)
+
 # ---------------------------------------------------------------------------
 # Aggregation Inserts & Queries
 # ---------------------------------------------------------------------------
@@ -707,6 +734,36 @@ def fetch_historical_prices_for_asset(symbol, start_date, end_date):
     finally:
         release_connection(conn)
 
+def fetch_latest_price(symbol, session_id):
+    """
+    Fetches the most recent price snapshot for an asset in a live session.
+    """
+    conn = get_db_connection()
+    if not conn: return None
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT price, event_timestamp
+            FROM price_history
+            WHERE asset_symbol = %s AND session_id = %s
+            ORDER BY event_timestamp DESC
+            LIMIT 1
+            """,
+            (symbol, session_id)
+        )
+        row = cur.fetchone()
+        if row:
+            columns = [desc[0] for desc in cur.description]
+            return dict(zip(columns, row))
+        return None
+    except Exception as e:
+        print(f"Error fetching latest price: {e}")
+        return None
+    finally:
+        release_connection(conn)
+
 # ---------------------------------------------------------------------------
 # Correlation Inserts
 # ---------------------------------------------------------------------------
@@ -739,6 +796,36 @@ def insert_correlations_batch(records):
     except Exception as e:
         print(f"Error batch-inserting correlations: {e}")
         conn.rollback()
+    finally:
+        release_connection(conn)
+
+def fetch_previous_correlation(symbol, session_id, interval='1m'):
+    """
+    Fetches the most recent correlation record for an asset to calculate day-over-day changes.
+    """
+    conn = get_db_connection()
+    if not conn: return None
+    
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT price_at_bucket, message_volume, avg_sentiment, weighted_sentiment, time_bucket
+            FROM sentiment_price_correlation
+            WHERE asset_symbol = %s AND session_id = %s AND bucket_interval = %s
+            ORDER BY time_bucket DESC
+            LIMIT 1
+            """,
+            (symbol, session_id, interval)
+        )
+        row = cur.fetchone()
+        if row:
+            columns = [desc[0] for desc in cur.description]
+            return dict(zip(columns, row))
+        return None
+    except Exception as e:
+        print(f"Error fetching previous correlation: {e}")
+        return None
     finally:
         release_connection(conn)
 

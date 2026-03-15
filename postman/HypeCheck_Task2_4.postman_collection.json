@@ -1,0 +1,58 @@
+{
+  "info": {
+    "name": "HypeCheck Task 2.4",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Task 2.4 endpoints: backtests, sessions, alerts, plus health and CORS preflight."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/"
+      }
+    },
+    {
+      "name": "Backtests (limit 10)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/backtests?limit=10"
+      }
+    },
+    {
+      "name": "Sessions (limit 10)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/sessions?limit=10"
+      }
+    },
+    {
+      "name": "Alerts (limit 20)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{baseUrl}}/api/alerts?limit=20"
+      }
+    },
+    {
+      "name": "CORS Preflight (Origin localhost:5173)",
+      "request": {
+        "method": "OPTIONS",
+        "header": [
+          { "key": "Origin", "value": "http://localhost:5173" },
+          { "key": "Access-Control-Request-Method", "value": "GET" }
+        ],
+        "url": "{{baseUrl}}/api/alerts"
+      }
+    }
+  ]
+}

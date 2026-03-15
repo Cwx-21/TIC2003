@@ -115,7 +115,7 @@ class CorrelationEngine:
             for _, row in merged.iterrows():
                 corr_records.append((
                     symbol,
-                    row['time_bucket'],
+                    row['time_bucket'].to_pydatetime() if hasattr(row['time_bucket'], 'to_pydatetime') else row['time_bucket'],
                     interval,
                     float(round(row['avg_sentiment_score'], 6)) if pd.notna(row['avg_sentiment_score']) else 0.0,
                     float(round(row['weighted_avg_sentiment'], 6)) if pd.notna(row['weighted_avg_sentiment']) else 0.0,

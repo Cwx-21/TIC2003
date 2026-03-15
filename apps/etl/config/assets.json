@@ -28,7 +28,7 @@
       "symbol": "NVDA",
       "name": "NVIDIA",
       "type": "stock",
-      "keywords": ["nvidia", "nvda", "ai", "gpu"],
+      "keywords": ["nvidia", "nvda", "gpu", "jensen huang", "geforce", "cuda"],
       "subreddits": ["nvidia", "stocks", "wallstreetbets"],
       "base_price": 880.0
     },
@@ -50,10 +50,12 @@
     }
   ],
   "telegram_channels": [
-    "Bitcoin",
-    "ethereum",
-    "WhaleTrades",
-    "CryptoCurrency",
-    "WallStreetBetsReal"
+    "bitcoin",
+    "Cointelegraph",
+    "CryptoWorldNews",
+    "cryptocurrency",
+    "ETHupdates",
+    "whale_alert_io",
+    "WallStreetBetsLIVE"
   ]
 }

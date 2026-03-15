@@ -7,12 +7,14 @@ HypeCheck is a **Social Media Event & Data Processing System** that measures the
 ```
 TIC2003/
 ├── apps/
-│   ├── web/          # React + Vite Frontend (Dashboard)
-│   ├── api/          # Node.js + Express Backend (REST API)
-│   └── etl/          # Python ETL Pipeline (Sentiment + Price Ingestion)
+│   ├── web/              # React + Vite Frontend (Dashboard)
+│   ├── api/              # Node.js + Express Backend (REST API)
+│   │   ├── database/     # Sequelize connection
+│   │   └── schemas/      # 10 Sequelize model definitions
+│   └── etl/              # Python ETL Pipeline (Sentiment + Price Ingestion)
 ├── docker-compose.yml
-├── PROJECT.MD        # Project specification & architecture
-└── ETL_DB_SCHEMA.md  # Database schema documentation
+├── PROJECT.MD            # Project specification & architecture
+└── ETL_DB_SCHEMA.md      # Database schema documentation
 ```
 
 ## Architecture
@@ -21,7 +23,7 @@ TIC2003/
 | :--------------- | :-------------------------------- | :-------------------------------------------------- |
 | **ETL Pipeline** | Python 3, VADER, Telethon, Pandas | Ingests social data, runs NLP, writes to PostgreSQL |
 | **Database**     | PostgreSQL 15                     | Central data warehouse (10 tables, 15 indexes)      |
-| **Backend API**  | Node.js, Express, Sequelize       | REST API serving processed data to frontend         |
+| **Backend API**  | Node.js, Express, Sequelize       | ORM models defined, REST endpoints in progress      |
 | **Frontend**     | React, Vite, Tailwind CSS         | Interactive dual-axis charts (Price vs. Sentiment)  |
 
 ### Database Schema (10 Tables)

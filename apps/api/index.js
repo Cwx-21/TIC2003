@@ -1,6 +1,6 @@
 import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
+import { Op } from "sequelize";
 import db from "./database/connection.js";
 import Alerts from "./schemas/alerts.js";
 import Assets from "./schemas/assets.js";
@@ -12,21 +12,32 @@ import Price_History from "./schemas/price_history.js";
 import Sentiment_Aggregations from "./schemas/sentiment_aggregations.js";
 import Sentiment_Logs from "./schemas/sentiment_logs.js";
 import Sentiment_Price_Correlation from "./schemas/sentiment_price_correlation.js";
-import { Op } from "sequelize";
+import { corsMiddleware } from "./middleware/cors.js";
+import rateLimit from "./middleware/rateLimit.js";
+import alertsRouter from "./routes/alerts.js";
+import backtestsRouter from "./routes/backtests.js";
+import sessionsRouter from "./routes/sessions.js";
+import assetsRouter from "./routes/assets.js";
+import sentimentRouter from "./routes/sentiment.js";
+import pricesRouter from "./routes/prices.js";
+import correlationRouter from "./routes/correlation.js";
+import sequelize, { hasDbConfig } from "./database/index.js";
 
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+app.set("trust proxy", 1);
+app.use(corsMiddleware);
 app.use(express.json());
+app.use("/api", rateLimit);
 
 app.get("/", (req, res) => {
   res.json({ message: "HypeCheck API is running" });
 });
 
-//Latest sentiment aggregations
+// Latest sentiment aggregations
 app.get("/sentiment_aggregations/:asset_symbol/latest", async (req, res) => {
   const asset_symbol = req.params.asset_symbol;
 
@@ -45,17 +56,20 @@ app.get("/sentiment_aggregations/:asset_symbol/latest", async (req, res) => {
     ],
   });
 
-  if (!results || results.length == 0)
+  if (!results || results.length === 0) {
     return res.status(200).json({ message: "No data" });
+  }
 
   return res.status(200).json({ message: results });
 });
 
-//Latest price
+// Latest price
 app.get("/historical_price/:asset_symbol/latest", async (req, res) => {
   const asset_symbol = req.params.asset_symbol;
 
-  if (!asset_symbol) return res.status(400).json({ message: "Missing Fields" });
+  if (!asset_symbol) {
+    return res.status(400).json({ message: "Missing Fields" });
+  }
 
   const results = await Historical_Prices.findAll({
     where: {
@@ -74,18 +88,21 @@ app.get("/historical_price/:asset_symbol/latest", async (req, res) => {
     ],
   });
 
-  if (!results || results.length == 0)
-    return res.status(200).json({ message: "No data for " + asset_symbol });
+  if (!results || results.length === 0) {
+    return res.status(200).json({ message: `No data for ${asset_symbol}` });
+  }
 
   return res.status(200).json({ message: results });
 });
 
-//Price range from start date to end date
+// Price range from start date to end date
 app.get("/historical_price/:asset_symbol", async (req, res) => {
   const asset_symbol = req.params.asset_symbol;
   const { start_date, end_date } = req.body;
 
-  if (!asset_symbol) return res.status(400).json({ message: "Missing Fields" });
+  if (!asset_symbol) {
+    return res.status(400).json({ message: "Missing Fields" });
+  }
 
   const results = await Historical_Prices.findAll({
     where: {
@@ -105,25 +122,48 @@ app.get("/historical_price/:asset_symbol", async (req, res) => {
     ],
   });
 
-  if (!results)
-    return res.status(400).json({ message: "No data for " + asset_symbol });
+  if (!results) {
+    return res.status(400).json({ message: `No data for ${asset_symbol}` });
+  }
 
   return res.status(200).json({ message: results });
 });
 
+app.use("/api/backtests", backtestsRouter);
+app.use("/api/sessions", sessionsRouter);
+app.use("/api/alerts", alertsRouter);
+app.use("/api/assets", assetsRouter);
+app.use("/api/sentiment", sentimentRouter);
+app.use("/api/prices", pricesRouter);
+app.use("/api/correlation", correlationRouter);
+
 app.listen(PORT, async (err) => {
   if (err) {
     console.log(`Cannot Listen on PORT: ${PORT}`);
-  } else {
-    console.log(`Server is Listening on: http://localhost:${PORT}/`);
+    return;
+  }
 
-    await db
-      .sync()
-      .then(async () => {
-        console.log("Connection to PostgreSQL is successful");
+  console.log(`Server is Listening on: http://localhost:${PORT}/`);
+
+  await db
+    .sync()
+    .then(async () => {
+      console.log("Connection to PostgreSQL is successful");
+    })
+    .catch((error) => {
+      console.log(`Failed to connect to PostgreSQL: ${error}`);
+    });
+
+  if (hasDbConfig && sequelize) {
+    sequelize
+      .authenticate()
+      .then(() => {
+        console.log("Database connection established.");
       })
       .catch((error) => {
-        console.log(`Failed to connect to PostgreSQL: ${error}`);
+        console.error("Unable to connect to the database:", error);
       });
+  } else {
+    console.warn("DATABASE_URL is not set. API endpoints will return errors.");
   }
 });

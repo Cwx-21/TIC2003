@@ -241,3 +241,5 @@ This document outlines the database schema architecture for the HypeCheck system
 **Pre-computation strategy:** Heavy reliance on ETL pre-computation. Instead of computing `SELECT AVG(sentiment) GROUP BY hour` on millions of rows at API query time, the Python ETL writes to `sentiment_aggregations` and `sentiment_price_correlation` asynchronously. This ensures API response times remain constant regardless of dataset size.
 
 **Price data source:** All historical and live prices use **yfinance** (free, no API key). Crypto tickers use Yahoo Finance pairs (e.g., `BTC-USD`), stocks use tickers directly (e.g., `TSLA`).
+
+**Sequelize ORM note:** The API layer (`apps/api/schemas/`) mirrors this schema with Sequelize models. One divergence: `author_credibility` uses an auto-increment INTEGER `author_id` as sole PK in Sequelize instead of the composite `(author_id VARCHAR, source)` PK defined here. This is because Sequelize does not natively support composite foreign key associations — `sentiment_logs.belongsTo(author_credibility)` requires a single-column reference. When querying by platform, filter with `{ where: { author_id, source } }` manually.
