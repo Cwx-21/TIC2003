@@ -1,95 +1,115 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './App.css'
+import api from "./utils/api";
 import SearchBar from "./components/SearchBar";
-import SectionCardStock from "./components/SectionCardStock";
+import SectionCardStock from "./components/SectionCardAsset";
 import SectionCardBacktest from "./components/SectionCardBacktest";
 import Chart from "./components/Chart";
-import { stockData, backtestData } from "./data/mockData";
 
 function App() {
-  const [selectedStock, setSelectedStock] = useState(null);
-  const [selectedBacktest, setSelectedBacktest] = useState(null);
-	const [searchStock, setSearchStock] = useState("");
-	const [searchBacktest, setSearchBacktest] = useState("");
+  const [assets, setAssets] = useState([]);
+  const [selectedAsset, setSelectedAsset] = useState("");
+  const [mode, setMode] = useState("live"); //toggle between live or backtest
+
+  const [sentimentData, setSentimentData] = useState([]);
+  const [priceData, setPriceData] = useState([]);
+
+  const [searchAsset, setSearchAsset] = useState("");
+  const [searchHistorical, setSearchHistorical] = useState("");
+  const [error, setError] = useState("");
   
-  //search stock
-  const filteredStocks = stockData.filter((item) => {
-		return (item.name.toLowerCase().includes(searchStock.toLowerCase()) ||
-				  item.symbol.toLowerCase().includes(searchStock.toLowerCase()));
+  //load asset list
+  useEffect(() => {
+    api.get("/assets")
+      .then((res) => {
+        setAssets(res.data.data);
+      })
+      .catch(() => {
+        setError("Failed to load assets");
+      });
+  }, []);
+  
+  //when user selects asset
+  useEffect(() => {
+    if (!selectedAsset) return;
+
+    setError("");
+
+    Promise.all([
+      api.get(`/sentiment/${selectedAsset}`),
+      api.get(`/prices/${selectedAsset}`),
+    ])
+      .then(([sentimentRes, priceRes]) => {
+        setSentimentData(sentimentRes.data.data);
+        setPriceData(priceRes.data.data);
+      })
+      .catch(() => {
+        setError("Failed to load chart data");
+      });
+  }, [selectedAsset]);
+
+
+  //search assets
+  const filteredAssets = assets.filter((item) => {
+		return (item.name.toLowerCase().includes(searchAsset.toLowerCase()) ||
+				  item.symbol.toLowerCase().includes(searchAsset.toLowerCase()));
   });
   
-  //search backtest
-	const filteredBacktests = backtestData.filter((item) => {
-		return item.name.toLowerCase().includes(searchBacktest.toLowerCase());
-  });
+  const displayedAssets = searchAsset ? filteredAssets : assets.slice(0, 5);
+
+  const handleAssetClick = (symbol) => {
+		setSelectedAsset(symbol);
+		setMode("live");
+	};
+
+  const handleBack = () => {
+		setSelectedAsset("");
+		setSentimentData([]);
+		setPriceData([]);
+		setError("");
+  };
   
-  let displayedStocks;
-
-  if (searchStock === "") {
-    const shuffle = [...stockData].sort(() => 0.5 - Math.random());
-    displayedStocks = shuffle.slice(0, 5);
-  } else {
-    displayedStocks = filteredStocks;
-  }
-
-  const displayedBacktests = searchBacktest === "" ? filteredBacktests.slice(0, 5) : filteredBacktests;
-
   return (
     <div className="page-container">
-      <h1 text-align="center">HypeCheck</h1>
-      {selectedStock === null ? (
-      <>
-        {/*Stock/Coin Search*/}
-          <SearchBar
-            placeholder="Search stock/coin..."
-            searchTerm={searchStock}
-            setSearchTerm={setSearchStock}
-          />
-      
-        {/* Trending Section */}
-        <SectionCardStock
-          title={"Trending stocks and coins"}
-          items={displayedStocks}
-          onItemClick={setSelectedStock}
-        /> 
-      </>
-      ) : (
-        <>
-          <Chart
-              stock={selectedStock}
-              onBack={() => setSelectedStock(null)}
-          /> 
-        </>
-      )}
+      <h1 className="title">HypeCheck</h1>
 
-      {selectedBacktest === null ? (
-      <>
-        {/*Historical Backtest Search*/}
-          <SearchBar
-            placeholder="Search historical backtests..."
-            searchTerm={searchBacktest}
-						setSearchTerm={setSearchBacktest}
-          />
-      
-        {/* Trending Section */}
-        <SectionCardBacktest
-          title="Infamous historical backtests"
-          items={displayedBacktests}
-          onItemClick={setSelectedBacktest}
-        />
-      </>
-      ) : (
-        <>
-          <Chart
-              stock={selectedBacktest}
-              onBack={() => setSelectedBacktest(null)}
-          /> 
-        </>
-      )}
+        {error && <p>{error}</p>}
 
-      
+        {!selectedAsset && (
+        <>
+          {/*Asset Search*/}
+            <SearchBar
+              search={searchAsset}
+              setSearch={setSearchAsset}
+              placeholder="Search assets..."
+            />
+
+            <SectionCardStock
+              title="Trending Assets"
+              items={displayedAssets}
+              onItemClick={handleAssetClick}
+            />
+
+            {/* <SectionCardBacktest
+              search={searchHistorical}
+              setSearch={setSearchHistorical}
+            /> */}
+          </>
+        )}
+
+      {/*Chart*/}
+        {selectedAsset && (
+          <Chart
+            selectedAsset={selectedAsset}
+            priceData={priceData}
+            sentimentData={sentimentData}
+            mode={mode}
+            setMode={setMode}
+            onBack={handleBack}
+          />
+        )}
     </div>
-  )
+  );
 }
 
 export default App

@@ -1,16 +1,15 @@
-function SearchBar({ placeholder , searchTerm, setSearchTerm }) {
-    
-    return (
-        <div className="card">
-            <input
-                type="text"
-                placeholder={placeholder}
-                className="search-input"
-                value={searchTerm}
-			    onChange={(entry) => setSearchTerm(entry.target.value)}
-            />
-        </div>
-    );
+function SearchBar({ placeholder, search, setSearch }) {
+	return (
+		<div className="card">
+			<input
+				type="text"
+				placeholder={placeholder}
+				className="search-input"
+				value={search}
+				onChange={(e) => setSearch(e.target.value)}
+			/>
+		</div>
+	);
 }
 
 export default SearchBar;

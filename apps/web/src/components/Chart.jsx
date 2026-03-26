@@ -1,29 +1,32 @@
 import "chart.js/auto";
 import { Line } from "react-chartjs-2";
 
-function Chart({ stock, onBack }) {
+function Chart({ selectedAsset, priceData, sentimentData, onBack }) {
 
-    const data = stock ? {
-        labels: stock.labels,
-        datasets: [
-            {
-                label: "Price",
-                data: stock.price,
+	//dates from priceData
+	const labels = priceData.map((item) => item.event_date).reverse();
+
+    const data = {
+		labels,
+		datasets: [
+			{
+				label: "Price",
+				data: priceData.map((item) => item.price_close).reverse(),
 				borderColor: "blue",
-				backgroundColor:"blue",
+				backgroundColor: "blue",
 				yAxisID: "priceAxis",
-				pointRadius: 0
-            },
-            {
-                label: "Sentiment",
-                data: stock.sentiment,
+				pointRadius: 0,
+			},
+			{
+				label: "Sentiment",
+				data: sentimentData.map((item) => item.weighted_avg_sentiment).reverse(),
 				borderColor: "green",
-				backgroundColor:"green",
+				backgroundColor: "green",
 				yAxisID: "sentimentAxis",
-				pointRadius: 0
-            },
-        ],
-    } : null;
+				pointRadius: 0,
+			},
+		],
+	};
 
     const options = {
 		responsive: true,
@@ -47,11 +50,14 @@ function Chart({ stock, onBack }) {
     return (
 		<div className="card">
 			<div className="chart-header">
-				<h2> {stock ? `Showing chart for ${stock.symbol}` : `No data found for ${stock.name}`} </h2>
+				<h2>Showing chart for {selectedAsset}</h2>
 				<button className="back-button" onClick={onBack}> Back </button>
 			</div>
 
-			{stock ? (<Line data={data} options={options} />) : <p>No data for this stock</p>}
+			{priceData.length > 0 && sentimentData.length > 0 ?
+				(<Line data={data} options={options} />) :
+				(<p>No data for this asset</p>)
+			}
 		</div>
 	);
 }

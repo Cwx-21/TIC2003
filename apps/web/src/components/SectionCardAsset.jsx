@@ -1,4 +1,4 @@
-function SectionCardStock({ title, items, onItemClick }) {
+function SectionCardAsset({ title, items, onItemClick }) {
 	return (
 		<div className="card">
 			<div className="card-title">{title}</div>
@@ -7,7 +7,7 @@ function SectionCardStock({ title, items, onItemClick }) {
 				<div
 					key={index}
 					className="list-item"
-					onClick={() => onItemClick(item)}
+					onClick={() => onItemClick(item.symbol)}
 				>
 					{item.name} ({item.symbol})
 				</div>
@@ -16,4 +16,4 @@ function SectionCardStock({ title, items, onItemClick }) {
 	);
 }
 
-export default SectionCardStock;
+export default SectionCardAsset;
