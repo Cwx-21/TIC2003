@@ -54,6 +54,33 @@ app.get("/sentiment_aggregations/:asset_symbol/latest", async (req, res) => {
       "weighted_avg_sentiment",
       "message_volume",
     ],
+    limit: 100,
+  });
+
+  if (!results || results.length == 0)
+    return res.status(200).json({ message: "No data" });
+
+  return res.status(200).json({ message: results });
+});
+
+//Sentiment aggregations range from start date to end date
+app.get("/sentiment_aggregations/:asset_symbol", async (req, res) => {
+  const asset_symbol = req.params.asset_symbol;
+  const { start_date, end_date } = req.body;
+  const results = await Sentiment_Aggregations.findAll({
+    where: {
+      asset_symbol,
+      time_bucket: { [Op.between]: [start_date, end_date] },
+    },
+    order: [["time_bucket", "DESC"]],
+    attributes: [
+      "asset_symbol",
+      "time_bucket",
+      "bucket_interval",
+      "avg_sentiment_score",
+      "weighted_avg_sentiment",
+      "message_volume",
+    ],
   });
 
   if (!results || results.length === 0) {
@@ -86,6 +113,7 @@ app.get("/historical_price/:asset_symbol/latest", async (req, res) => {
       "volume",
       "source",
     ],
+    limit: 100,
   });
 
   if (!results || results.length === 0) {
