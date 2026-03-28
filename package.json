@@ -7,19 +7,14 @@
   "scripts": {
     "dev:web": "npm run dev --prefix apps/web",
     "dev:api": "npm run dev --prefix apps/api",
-    "dev:etl": ".\\apps\\etl\\venv\\Scripts\\python.exe .\\apps\\etl\\main.py",
+    "dev:etl": "apps/etl/venv/bin/python apps/etl/main.py",
     "docker:up": "docker-compose up --build",
     "docker:down": "docker-compose down",
     "setup:api": "cd apps/api && npm install",
     "setup:web": "cd apps/web && npm install",
-    "setup:etl": "py -m venv apps/etl/venv && .\\apps\\etl\\venv\\Scripts\\pip.exe install -r .\\apps\\etl\\requirements.txt"
+    "setup:etl": "python3 -m venv apps/etl/venv && apps/etl/venv/bin/pip install -r apps/etl/requirements.txt"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "axios": "^1.13.6",
-    "chart.js": "^4.5.1",
-    "react-chartjs-2": "^5.3.1"
-  }
+  "license": "ISC"
 }

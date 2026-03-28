@@ -19,12 +19,12 @@ TIC2003/
 
 ## Architecture
 
-| Layer            | Tech                              | Role                                                |
-| :--------------- | :-------------------------------- | :-------------------------------------------------- |
-| **ETL Pipeline** | Python 3, VADER, Telethon, Pandas | Ingests social data, runs NLP, writes to PostgreSQL |
-| **Database**     | PostgreSQL 15                     | Central data warehouse (10 tables, 15 indexes)      |
-| **Backend API**  | Node.js, Express, Sequelize       | ORM models defined, REST endpoints in progress      |
-| **Frontend**     | React, Vite, Tailwind CSS         | Interactive dual-axis charts (Price vs. Sentiment)  |
+| Layer            | Tech                                 | Role                                                |
+| :--------------- | :----------------------------------- | :-------------------------------------------------- |
+| **ETL Pipeline** | Python 3.12, VADER, Telethon, Pandas | Ingests social data, runs NLP, writes to PostgreSQL |
+| **Database**     | PostgreSQL 15                        | Central data warehouse (10 tables, 15 indexes)      |
+| **Backend API**  | Node.js 22, Express, Sequelize       | 7 REST endpoints live at `168.144.37.237/api`       |
+| **Frontend**     | React 19, Vite 7, Tailwind CSS       | Interactive dual-axis charts (Price vs. Sentiment)  |
 
 ### Database Schema (10 Tables)
 
@@ -49,8 +49,8 @@ TIC2003/
 
 ### Prerequisites
 
-- **Node.js** v18+
-- **Python** 3.9+
+- **Node.js** v22+
+- **Python** 3.12+
 - **Docker** (for PostgreSQL) or a local PostgreSQL 15 installation
 
 <details>
@@ -163,6 +163,39 @@ All scripts are run from the **root** directory:
 | `npm run setup:web`                          | Installs frontend dependencies                        |
 | `npm run setup:api`                          | Installs backend dependencies                         |
 | `npm run setup:etl`                          | Creates Python venv and installs requirements         |
+
+## Live Server
+
+The backend API and database are deployed on a shared DigitalOcean Droplet. It can be use instead of running the full stack locally.
+
+| What     | URL                                |
+| :------- | :--------------------------------- |
+| Frontend | `http://168.144.37.237`            |
+| API root | `http://168.144.37.237/api/assets` |
+
+**Available endpoints:**
+
+```
+GET /api/assets
+GET /api/sentiment/:symbol
+GET /api/prices/:symbol
+GET /api/correlation/:symbol
+GET /api/alerts
+GET /api/backtests
+GET /api/sessions
+```
+
+**Database access** (TablePlus / DBeaver / pgAdmin):
+
+- Host: `168.144.37.237` · Port: `5432` · User: `user` · Password: `password` · DB: `hypecheck`
+
+**Frontend-only local dev** (no need to run Docker or API locally):
+
+set axios request url to http://168.144.37.237
+
+Then just run `npm run dev:web`.
+
+---
 
 ## Tracked Assets
 
