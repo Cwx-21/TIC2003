@@ -1,65 +1,72 @@
 import "chart.js/auto";
 import { Line } from "react-chartjs-2";
 
-function Chart({ selectedAsset, priceData, sentimentData, onBack }) {
+function Chart({ selectedAsset, correlationData, loading, mode, onBack }) {
+  const rows = [...correlationData].reverse();
+  const labels = rows.map((r) => r.time_bucket.slice(0, 10));
 
-	//dates from priceData
-	const labels = priceData.map((item) => item.event_date).reverse();
+  const data = {
+    labels,
+    datasets: [
+      {
+        label: "Price",
+        data: rows.map((r) => r.price_at_bucket),
+        borderColor: "blue",
+        backgroundColor: "blue",
+        yAxisID: "priceAxis",
+        pointRadius: 0,
+      },
+      {
+        label: "Sentiment",
+        data: rows.map((r) => r.weighted_sentiment),
+        borderColor: "green",
+        backgroundColor: "green",
+        yAxisID: "sentimentAxis",
+        pointRadius: 0,
+      },
+    ],
+  };
 
-    const data = {
-		labels,
-		datasets: [
-			{
-				label: "Price",
-				data: priceData.map((item) => item.price_close).reverse(),
-				borderColor: "blue",
-				backgroundColor: "blue",
-				yAxisID: "priceAxis",
-				pointRadius: 0,
-			},
-			{
-				label: "Sentiment",
-				data: sentimentData.map((item) => item.weighted_avg_sentiment).reverse(),
-				borderColor: "green",
-				backgroundColor: "green",
-				yAxisID: "sentimentAxis",
-				pointRadius: 0,
-			},
-		],
-	};
+  const options = {
+    responsive: true,
+    scales: {
+      priceAxis: {
+        type: "linear",
+        position: "left",
+      },
+      sentimentAxis: {
+        type: "linear",
+        position: "right",
+        min: -1,
+        max: 1,
+        grid: {
+          drawOnChartArea: false,
+        },
+      },
+    },
+  };
 
-    const options = {
-		responsive: true,
-		scales: {
-			priceAxis: {
-				type: "linear",
-				position: "left",
-			},
-			sentimentAxis: {
-				type: "linear",
-				position: "right",
-				min: -1,
-				max: 1,
-				grid: {
-					drawOnChartArea: false,
-				},
-			},
-		},
-	};
-    
-    return (
-		<div className="card">
-			<div className="chart-header">
-				<h2>Showing chart for {selectedAsset}</h2>
-				<button className="back-button" onClick={onBack}> Back </button>
-			</div>
+  const emptyMessage =
+    mode === "live"
+      ? "No live data yet — ETL is running."
+      : "No data for this asset.";
 
-			{priceData.length > 0 && sentimentData.length > 0 ?
-				(<Line data={data} options={options} />) :
-				(<p>No data for this asset</p>)
-			}
-		</div>
-	);
+  return (
+    <div className="card">
+      <div className="chart-header">
+        <h2>Showing chart for {selectedAsset}</h2>
+        <button className="back-button" onClick={onBack}>
+          Back
+        </button>
+      </div>
+
+      {loading && <p>Loading...</p>}
+      {!loading && correlationData.length > 0 && (
+        <Line data={data} options={options} />
+      )}
+      {!loading && correlationData.length === 0 && <p>{emptyMessage}</p>}
+    </div>
+  );
 }
 
 export default Chart;
