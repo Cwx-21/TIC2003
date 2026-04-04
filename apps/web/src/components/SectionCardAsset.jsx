@@ -1,19 +1,24 @@
 function SectionCardAsset({ title, items, onItemClick }) {
-	return (
-		<div className="card">
-			<div className="card-title">{title}</div>
-
-			{items.map((item, index) => (
-				<div
-					key={index}
-					className="list-item"
-					onClick={() => onItemClick(item.symbol)}
-				>
-					{item.name} ({item.symbol})
-				</div>
-			))}
-		</div>
-	);
+  return (
+    <div>
+      <div className='container'>
+        <div className='header'>
+          <h2>{title}</h2>
+        </div>
+        <div className="card-list">
+          {items.map((item, index) => (
+            <div
+              key={index}
+              className='card'
+              onClick={() => onItemClick(item.symbol)}
+            >
+              {item.name} ({item.symbol})
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default SectionCardAsset;
