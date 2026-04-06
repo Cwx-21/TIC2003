@@ -1,5 +1,9 @@
 import "chart.js/auto";
 import { Line } from "react-chartjs-2";
+import zoomPlugin from "chartjs-plugin-zoom";
+import { Chart as ChartJS } from "chart.js";
+
+ChartJS.register(zoomPlugin);
 
 function Chart({ selectedAsset, correlationData, loading, mode, onBack }) {
   const rows = [...correlationData].reverse();
@@ -29,6 +33,11 @@ function Chart({ selectedAsset, correlationData, loading, mode, onBack }) {
 
   const options = {
     responsive: true,
+    interaction: {
+      mode: "index",
+      intersect: false,
+      axis: "x",
+    },
     scales: {
       priceAxis: {
         type: "linear",
@@ -41,6 +50,23 @@ function Chart({ selectedAsset, correlationData, loading, mode, onBack }) {
         max: 1,
         grid: {
           drawOnChartArea: false,
+        },
+      },
+    },
+    plugins: {
+      zoom: {
+        pan: {
+          enabled: true,
+          mode: "x",
+        },
+        zoom: {
+          wheel: {
+            enabled: true,
+          },
+          pinch: {
+            enabled: true,
+          },
+          mode: "x",
         },
       },
     },
