@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import "./App.css";
 import api from "./utils/api";
 import SearchBar from "./components/SearchBar";
-import SectionCardStock from "./components/SectionCardAsset";
-import SectionCardBacktest from "./components/SectionCardBacktest";
+import SectionCardAsset from "./components/SectionCardAsset";
 import Chart from "./components/Chart";
 
 function App() {
@@ -24,7 +23,7 @@ function App() {
     api
       .get("/assets")
       .then((res) => {
-        setAssets(res.data.data);
+        setAssets(res.data.data || []);
       })
       .catch(() => {
         setError("Failed to load assets");
@@ -65,7 +64,7 @@ function App() {
           signal: controller.signal,
         });
       })
-      .then((res) => setCorrelationData(res.data.data))
+      .then((res) => setCorrelationData(res.data.data || []))
       .catch((err) => {
         if (err.name !== "CanceledError" && err.code !== "ERR_CANCELED") {
           setError("Failed to load chart data");
@@ -112,16 +111,11 @@ function App() {
             placeholder="Search assets..."
           />
 
-          <SectionCardStock
+          <SectionCardAsset
             title="Trending Assets"
             items={displayedAssets}
             onItemClick={handleAssetClick}
           />
-
-          {/* <SectionCardBacktest
-              search={searchHistorical}
-              setSearch={setSearchHistorical}
-            /> */}
         </>
       )}
 

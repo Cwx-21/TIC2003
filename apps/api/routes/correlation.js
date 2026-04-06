@@ -1,6 +1,6 @@
 import express from "express";
 import { QueryTypes } from "sequelize";
-import { parseLimit, parseString, parsePositiveInt } from "../utils/query.js";
+import { parseString, parsePositiveInt } from "../utils/query.js";
 import { getDbOrError, normalizeSymbol } from "../utils/task2_2.js";
 
 const router = express.Router();
@@ -14,13 +14,12 @@ router.get("/:symbol", async (req, res) => {
     return res.status(400).json({ error: "Symbol is required" });
   }
 
-  const limit = parseLimit(req.query.limit, 200, 500);
   const interval = parseString(req.query.interval);
   const backtestId = parsePositiveInt(req.query.backtest_id);
   const sessionId = parsePositiveInt(req.query.session_id);
 
   const conditions = ["asset_symbol = :symbol"];
-  const replacements = { symbol, limit };
+  const replacements = { symbol};
 
   if (interval) {
     conditions.push("bucket_interval = :interval");
@@ -55,7 +54,6 @@ router.get("/:symbol", async (req, res) => {
     FROM sentiment_price_correlation
     ${whereClause}
     ORDER BY time_bucket DESC
-    LIMIT :limit;
   `;
 
   try {
