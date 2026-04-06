@@ -3,6 +3,7 @@ import "./App.css";
 import api from "./utils/api";
 import SearchBar from "./components/SearchBar";
 import SectionCardAsset from "./components/SectionCardAsset";
+import DateRangeSelector from "./components/DateRangeSelector";
 import Chart from "./components/Chart";
 
 function App() {
@@ -16,6 +17,8 @@ function App() {
   const [sessionId, setSessionId] = useState(null);
 
   const [searchAsset, setSearchAsset] = useState("");
+  const [startDate, setStartDate] = useState("");
+	const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
 
   //load asset list
@@ -88,13 +91,32 @@ function App() {
   const handleAssetClick = (symbol) => {
     setSelectedAsset(symbol);
     setMode("backtest");
+    setStartDate("");
+		setEndDate("");
   };
 
   const handleBack = () => {
     setSelectedAsset("");
     setCorrelationData([]);
+    setStartDate("");
+		setEndDate("");
     setError("");
   };
+
+  //date range selector
+  const filteredCorrelationData = correlationData.filter((item) => {
+    const itemDate = new Date(item.time_bucket);
+
+    const afterStart = startDate
+      ? itemDate >= new Date(startDate)
+      : true;
+
+    const beforeEnd = endDate
+      ? itemDate <= new Date(endDate + "T23:59:59")
+      : true;
+
+    return afterStart && beforeEnd;
+  });
 
   return (
     <div className="page-container">
@@ -136,6 +158,13 @@ function App() {
               Live{!sessionId ? " (no session)" : ""}
             </button>
           </div>
+
+          <DateRangeSelector
+            startDate={startDate}
+            endDate={endDate}
+            setStartDate={setStartDate}
+            setEndDate={setEndDate}
+          />
 
           <Chart
             selectedAsset={selectedAsset}
