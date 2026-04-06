@@ -78,10 +78,10 @@ function Chart({ selectedAsset, correlationData, loading, mode, onBack }) {
       : "No data for this asset.";
 
   return (
-    <div className="card">
-      <div className="chart-header">
+    <div className="container">
+      <div className="header">
         <h2>Showing chart for {selectedAsset}</h2>
-        <button className="back-button" onClick={onBack}>
+        <button className="btn" onClick={onBack}>
           Back
         </button>
       </div>
