@@ -1,57 +1,86 @@
 import { useEffect, useState } from "react";
 import api from "./utils/api";
 import SearchBar from "./components/SearchBar";
-import SectionCardStock from "./components/SectionCardAsset";
-import SectionCardBacktest from "./components/SectionCardBacktest";
+import SectionCardAsset from "./components/SectionCardAsset";
+import DateRangeSelector from "./components/DateRangeSelector";
 import Chart from "./components/Chart";
 import Alerts from "./components/Alerts";
 
 function App() {
   const [assets, setAssets] = useState([]);
   const [selectedAsset, setSelectedAsset] = useState("");
-  const [mode, setMode] = useState("live"); //toggle between live or backtest
+  const [mode, setMode] = useState("backtest"); //toggle between live or backtest
 
-  const [sentimentData, setSentimentData] = useState([]);
-  const [priceData, setPriceData] = useState([]);
+  const [correlationData, setCorrelationData] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [backtestId, setBacktestId] = useState(null);
+  const [sessionId, setSessionId] = useState(null);
 
   const [searchAsset, setSearchAsset] = useState("");
-  const [searchHistorical, setSearchHistorical] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
 
   // For alerts
   const [alerts, setAlerts] = useState([]);
+  const [limit, setLimit] = useState(10);
 
   //load asset list
   useEffect(() => {
     api
       .get("/assets")
       .then((res) => {
-        setAssets(res.data.data);
+        setAssets(res.data.data || []);
       })
       .catch(() => {
         setError("Failed to load assets");
       });
   }, []);
 
-  //when user selects asset
+  // Load latest backtest ID and active session ID on mount
   useEffect(() => {
-    if (!selectedAsset) return;
-
-    setError("");
-    Promise.all([
-      api.get(`/sentiment/${selectedAsset}`),
-      api.get(`/prices/${selectedAsset}`),
-      api.get(`/alerts?asset_symbol=${selectedAsset}&limit=10`),
-    ])
-      .then(([sentimentRes, priceRes, alertsRes]) => {
-        setSentimentData(sentimentRes.data.data);
-        setPriceData(priceRes.data.data);
-        setAlerts(alertsRes.data.data);
+    Promise.all([api.get("/backtests"), api.get("/sessions?status=running")])
+      .then(([btRes, sesRes]) => {
+        setBacktestId(btRes.data.data[0]?.id ?? null);
+        setSessionId(sesRes.data.data[0]?.id ?? null);
       })
       .catch(() => {
-        setError("Failed to load chart data");
+        // Non-fatal: chart will show empty state
       });
-  }, [selectedAsset]);
+  }, []);
+
+  // Fetch correlation data when asset or mode changes
+  useEffect(() => {
+    if (!selectedAsset) return;
+    if (mode === "backtest" && !backtestId) return;
+    if (mode === "live" && !sessionId) return;
+
+    const controller = new AbortController();
+
+    const params =
+      mode === "backtest"
+        ? `?backtest_id=${backtestId}&interval=1d`
+        : `?session_id=${sessionId}`;
+
+    Promise.resolve()
+      .then(() => {
+        setError("");
+        setLoading(true);
+        setCorrelationData([]);
+        return api.get(`/correlation/${selectedAsset}${params}`, {
+          signal: controller.signal,
+        });
+      })
+      .then((res) => setCorrelationData(res.data.data || []))
+      .catch((err) => {
+        if (err.name !== "CanceledError" && err.code !== "ERR_CANCELED") {
+          setError("Failed to load chart data");
+        }
+      })
+      .finally(() => setLoading(false));
+
+    return () => controller.abort();
+  }, [selectedAsset, mode, backtestId, sessionId]);
 
   //search assets
   const filteredAssets = assets.filter((item) => {
@@ -65,19 +94,58 @@ function App() {
 
   const handleAssetClick = (symbol) => {
     setSelectedAsset(symbol);
-    setMode("live");
+    setMode("backtest");
+    setStartDate("");
+    setEndDate("");
   };
 
   const handleBack = () => {
     setSelectedAsset("");
-    setSentimentData([]);
-    setPriceData([]);
+    setCorrelationData([]);
+    setStartDate("");
+    setEndDate("");
     setError("");
   };
 
+  //date range selector
+  const filteredCorrelationData = correlationData.filter((item) => {
+    const itemDate = new Date(item.time_bucket);
+
+    const afterStart = startDate ? itemDate >= new Date(startDate) : true;
+
+    const beforeEnd = endDate
+      ? itemDate <= new Date(endDate + "T23:59:59")
+      : true;
+
+    return afterStart && beforeEnd;
+  });
+
   return (
-    <div className='page-container'>
-      <h1 className='title'>HypeCheck</h1>
+    <div className="page-container">
+      <div className="flex-container">
+        <h1 className="title">HypeCheck</h1>
+        {selectedAsset && (
+          <div className="flex-container">
+            <div className="mode-toggle">
+              <button
+                onClick={() => setMode("backtest")}
+                disabled={mode === "backtest"}
+              >
+                Backtest
+              </button>
+              <button
+                onClick={() => setMode("live")}
+                disabled={mode === "live" || !sessionId}
+              >
+                Live{!sessionId ? " (no session)" : ""}
+              </button>
+            </div>
+            <button className="btn-secondary" onClick={handleBack}>
+              ⬅ Back
+            </button>
+          </div>
+        )}
+      </div>
 
       {error && <p>{error}</p>}
 
@@ -87,19 +155,14 @@ function App() {
           <SearchBar
             search={searchAsset}
             setSearch={setSearchAsset}
-            placeholder='Search assets...'
+            placeholder="Search assets..."
           />
 
-          <SectionCardStock
-            title='Trending Assets'
+          <SectionCardAsset
+            title="Trending Assets"
             items={displayedAssets}
             onItemClick={handleAssetClick}
           />
-
-          {/* <SectionCardBacktest
-              search={searchHistorical}
-              setSearch={setSearchHistorical}
-            /> */}
         </>
       )}
 
@@ -108,13 +171,16 @@ function App() {
         <>
           <Chart
             selectedAsset={selectedAsset}
-            priceData={priceData}
-            sentimentData={sentimentData}
+            correlationData={correlationData}
+            loading={loading}
             mode={mode}
-            setMode={setMode}
-            onBack={handleBack}
+            startDate={startDate}
+            endDate={endDate}
+            setStartDate={setStartDate}
+            setEndDate={setEndDate}
           />
-          <Alerts alertData={alerts} />
+
+          <Alerts selectedAsset={selectedAsset} />
         </>
       )}
     </div>

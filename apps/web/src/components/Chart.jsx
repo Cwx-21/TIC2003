@@ -1,9 +1,23 @@
 import "chart.js/auto";
 import { Line } from "react-chartjs-2";
+import zoomPlugin from "chartjs-plugin-zoom";
+import { Chart as ChartJS } from "chart.js";
+import DateRangeSelector from "./DateRangeSelector";
 
-function Chart({ selectedAsset, priceData, sentimentData, onBack }) {
-  //dates from priceData
-  const labels = priceData.map((item) => item.event_date).reverse();
+ChartJS.register(zoomPlugin);
+
+function Chart({
+  selectedAsset,
+  correlationData,
+  loading,
+  mode,
+  startDate,
+  endDate,
+  setStartDate,
+  setEndDate,
+}) {
+  const rows = [...correlationData].reverse();
+  const labels = rows.map((r) => r.time_bucket.slice(0, 10));
 
   const data = {
     labels,
@@ -52,16 +66,21 @@ function Chart({ selectedAsset, priceData, sentimentData, onBack }) {
     <div className='container'>
       <div className='header'>
         <h2>Showing chart for {selectedAsset}</h2>
-        <button className='btn' onClick={onBack}>
-          {" "}
-          Back{" "}
-        </button>
+        <DateRangeSelector
+          startDate={startDate}
+          endDate={endDate}
+          setStartDate={setStartDate}
+          setEndDate={setEndDate}
+        />
       </div>
 
       {priceData.length > 0 && sentimentData.length > 0 ? (
         <Line data={data} options={options} />
       ) : (
         <p>No data for this asset</p>
+      )}
+      {!loading && correlationData.length === 0 && (
+        <div className="alert-empty">{emptyMessage}</div>
       )}
     </div>
   );
