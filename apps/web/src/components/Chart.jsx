@@ -24,7 +24,7 @@ function Chart({
     datasets: [
       {
         label: "Price",
-        data: priceData.map((item) => item.price_close).reverse(),
+        data: rows.map((r) => r.price_at_bucket),
         borderColor: "blue",
         backgroundColor: "blue",
         yAxisID: "priceAxis",
@@ -32,9 +32,7 @@ function Chart({
       },
       {
         label: "Sentiment",
-        data: sentimentData
-          .map((item) => item.weighted_avg_sentiment)
-          .reverse(),
+        data: rows.map((r) => r.weighted_sentiment),
         borderColor: "green",
         backgroundColor: "green",
         yAxisID: "sentimentAxis",
@@ -45,6 +43,11 @@ function Chart({
 
   const options = {
     responsive: true,
+    interaction: {
+      mode: "index",
+      intersect: false,
+      axis: "x",
+    },
     scales: {
       priceAxis: {
         type: "linear",
@@ -60,11 +63,33 @@ function Chart({
         },
       },
     },
+    plugins: {
+      zoom: {
+        pan: {
+          enabled: true,
+          mode: "x",
+        },
+        zoom: {
+          wheel: {
+            enabled: true,
+          },
+          pinch: {
+            enabled: true,
+          },
+          mode: "x",
+        },
+      },
+    },
   };
 
+  const emptyMessage =
+    mode === "live"
+      ? "No live data yet — ETL is running."
+      : "No data for this asset.";
+
   return (
-    <div className='container'>
-      <div className='header'>
+    <div className="container">
+      <div className="header">
         <h2>Showing chart for {selectedAsset}</h2>
         <DateRangeSelector
           startDate={startDate}
@@ -74,10 +99,9 @@ function Chart({
         />
       </div>
 
-      {priceData.length > 0 && sentimentData.length > 0 ? (
+      {loading && <p>Loading...</p>}
+      {!loading && correlationData.length > 0 && (
         <Line data={data} options={options} />
-      ) : (
-        <p>No data for this asset</p>
       )}
       {!loading && correlationData.length === 0 && (
         <div className="alert-empty">{emptyMessage}</div>
