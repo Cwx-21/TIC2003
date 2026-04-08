@@ -1,9 +1,10 @@
 function DateRangeSelector({ startDate, endDate, setStartDate, setEndDate }) {
   return (
-    <div className="date-range">
+    <div className="header">
       <div>
         <p>Start Date</p>
         <input
+          className="select"
           type="date"
           value={startDate}
           onChange={(e) => setStartDate(e.target.value)}
@@ -13,20 +14,23 @@ function DateRangeSelector({ startDate, endDate, setStartDate, setEndDate }) {
       <div>
         <p>End Date</p>
         <input
+          className="select"
           type="date"
           value={endDate}
           onChange={(e) => setEndDate(e.target.value)}
         />
       </div>
-
-      <button
-        onClick={() => {
-          setStartDate("");
-          setEndDate("");
-        }}
-      >
-        Clear
-      </button>
+      <div style={{ marginTop: "18px" }}>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setStartDate("");
+            setEndDate("");
+          }}
+        >
+          Clear
+        </button>
+      </div>
     </div>
   );
 }
