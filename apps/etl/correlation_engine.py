@@ -7,18 +7,15 @@ configurable thresholds.
 """
 
 import pandas as pd
-from datetime import datetime
 from db import (
     fetch_aggregations_for_backtest,
     fetch_historical_prices_for_asset,
     insert_correlations_batch,
-    insert_alert
 )
-
-
-# Configurable thresholds
-DIVERGENCE_THRESHOLD = 0.5       # abs(divergence) > this triggers an alert
-VOLUME_SPIKE_THRESHOLD = 3.0     # message_volume > (mean * this) triggers a volume spike alert
+from alert_generator import (
+    DIVERGENCE_THRESHOLD, VOLUME_SPIKE_THRESHOLD,
+    generate_divergence_alert, generate_volume_spike_alert
+)
 
 
 class CorrelationEngine:
@@ -142,52 +139,35 @@ class CorrelationEngine:
         print(f"{'='*60}\n")
 
     def _generate_alerts(self, merged_df, symbol, backtest_id):
-        """Checks for divergence and volume spike anomalies and inserts alerts."""
+        """Checks for divergence and volume spike anomalies using shared alert generator."""
         alert_count = 0
 
         # 1. Divergence alerts
-        divergence_rows = merged_df[merged_df['divergence'].abs() > self.divergence_threshold]
-        for _, row in divergence_rows.iterrows():
-            div_val = row['divergence']
-            direction = "bullish sentiment / bearish price" if div_val > 0 else "bearish sentiment / bullish price"
-            severity = 'critical' if abs(div_val) > (self.divergence_threshold * 2) else 'warning'
-
-            insert_alert(
-                asset_symbol=symbol,
-                alert_type='divergence',
-                severity=severity,
-                message=f"Sentiment-price divergence detected for {symbol}: {direction} (divergence={div_val:.3f})",
-                details={
-                    'divergence': float(round(div_val, 4)),
-                    'weighted_sentiment': float(round(row['weighted_avg_sentiment'], 4)),
-                    'price_change_pct': float(round(row['price_change_pct'], 4)),
-                    'price_close': float(round(row['price_close'], 2)),
-                    'message_volume': int(row['message_volume'])
-                },
-                event_timestamp=row['time_bucket'],
-                backtest_id=backtest_id
-            )
-            alert_count += 1
+        for _, row in merged_df.iterrows():
+            if generate_divergence_alert(
+                symbol=symbol,
+                divergence=row['divergence'],
+                weighted_avg=row['weighted_avg_sentiment'],
+                price_change_pct=row['price_change_pct'],
+                price_close=row['price_close'],
+                msg_volume=row['message_volume'],
+                timestamp=row['time_bucket'],
+                backtest_id=backtest_id,
+                threshold=self.divergence_threshold
+            ):
+                alert_count += 1
 
         # 2. Volume spike alerts
         mean_volume = merged_df['message_volume'].mean()
-        if mean_volume > 0:
-            spike_threshold = mean_volume * self.volume_spike_threshold
-            spike_rows = merged_df[merged_df['message_volume'] > spike_threshold]
-            for _, row in spike_rows.iterrows():
-                insert_alert(
-                    asset_symbol=symbol,
-                    alert_type='volume_spike',
-                    severity='info',
-                    message=f"Message volume spike for {symbol}: {int(row['message_volume'])} messages (avg: {int(mean_volume)})",
-                    details={
-                        'message_volume': int(row['message_volume']),
-                        'mean_volume': float(round(mean_volume, 1)),
-                        'spike_ratio': float(round(row['message_volume'] / mean_volume, 2))
-                    },
-                    event_timestamp=row['time_bucket'],
-                    backtest_id=backtest_id
-                )
+        for _, row in merged_df.iterrows():
+            if generate_volume_spike_alert(
+                symbol=symbol,
+                msg_count=int(row['message_volume']),
+                baseline_volume=mean_volume,
+                timestamp=row['time_bucket'],
+                backtest_id=backtest_id,
+                spike_threshold=self.volume_spike_threshold
+            ):
                 alert_count += 1
 
         if alert_count > 0:

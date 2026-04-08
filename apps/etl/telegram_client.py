@@ -1,11 +1,12 @@
 import os
 import re
 import asyncio
-import json
 from telethon import TelegramClient, events
 from telethon.sessions import StringSession
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 from db import insert_sentiment, upsert_author_credibility
+from config_loader import load_config
+from asset_matcher import identify_asset as match_asset
 
 # Load credentials
 API_ID = os.getenv('TELEGRAM_API_ID')
@@ -45,12 +46,6 @@ _CRYPTO_LEXICON = {
     'etf': 1.5,        'approval': 1.5,
 }
 
-def load_config():
-    """Loads assets from the JSON config."""
-    config_path = os.path.join(os.path.dirname(__file__), 'config', 'assets.json')
-    with open(config_path, 'r') as f:
-        return json.load(f)
-
 class TelegramMonitor:
     def __init__(self, session_id=None):
         if not API_ID or not API_HASH:
@@ -68,16 +63,8 @@ class TelegramMonitor:
         self.message_count = 0
 
     def identify_asset(self, text):
-        """
-        Returns the asset symbol if found in text.
-        """
-        text_lower = text.lower()
-        for asset in self.assets:
-            # Check keywords
-            for kw in asset['keywords']:
-                if kw in text_lower:
-                    return asset['symbol']
-        return None  # Return None if no asset found, catch-all "CRYPTO" logic removed for precision
+        """Delegates to shared asset_matcher module."""
+        return match_asset(text, self.assets)
 
     async def start(self):
         if not self.client:

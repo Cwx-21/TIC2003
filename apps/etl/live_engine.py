@@ -1,19 +1,15 @@
-import asyncio
 import pandas as pd
-from datetime import datetime, timezone, timedelta
 from db import (
-    fetch_sentiment_logs_for_window, 
-    fetch_latest_price, 
+    fetch_sentiment_logs_for_window,
+    fetch_latest_price,
     fetch_previous_correlation,
     insert_aggregations_batch,
     insert_correlations_batch,
-    insert_alert,
     fetch_active_assets
 )
-
-# Configurable thresholds matching Backtest Engine
-DIVERGENCE_THRESHOLD = 0.5
-VOLUME_SPIKE_THRESHOLD = 3.0
+from alert_generator import (
+    generate_divergence_alert, generate_volume_spike_alert
+)
 
 class LiveProcessor:
     def __init__(self, session_id):
@@ -106,48 +102,31 @@ class LiveProcessor:
             ))
             
             # --- 4. Alert Generation ---
-            
+
             # Divergence Alert
-            if abs(divergence) > DIVERGENCE_THRESHOLD:
-                direction = "bullish sentiment / bearish price" if divergence > 0 else "bearish sentiment / bullish price"
-                severity = 'critical' if abs(divergence) > (DIVERGENCE_THRESHOLD * 2) else 'warning'
-                insert_alert(
-                    asset_symbol=symbol,
-                    alert_type='divergence',
-                    severity=severity,
-                    message=f"Sentiment-price divergence detected for {symbol}: {direction} (divergence={divergence:.3f})",
-                    details={
-                        'divergence': float(round(divergence, 4)),
-                        'weighted_sentiment': float(round(weighted_avg, 4)),
-                        'price_change_pct': float(round(price_change_pct, 4)),
-                        'price_close': float(round(current_price, 2)),
-                        'message_volume': msg_count
-                    },
-                    event_timestamp=start_time,
+            if generate_divergence_alert(
+                symbol=symbol,
+                divergence=divergence,
+                weighted_avg=weighted_avg,
+                price_change_pct=price_change_pct,
+                price_close=current_price,
+                msg_volume=msg_count,
+                timestamp=start_time,
+                backtest_id=None,
+                session_id=self.session_id
+            ):
+                alert_count += 1
+
+            # Volume Spike Alert
+            if previous_corr and previous_corr['message_volume'] > 0 and msg_count >= 5:
+                if generate_volume_spike_alert(
+                    symbol=symbol,
+                    msg_count=msg_count,
+                    baseline_volume=previous_corr['message_volume'],
+                    timestamp=start_time,
                     backtest_id=None,
                     session_id=self.session_id
-                )
-                alert_count += 1
-                
-            # Volume Spike Alert
-            if previous_corr and previous_corr['message_volume'] > 0:
-                # We use the previous bucket as our "mean" baseline for simplicity in real-time
-                baseline = previous_corr['message_volume']
-                if msg_count > (baseline * VOLUME_SPIKE_THRESHOLD) and msg_count >= 5: # min 5 msgs to kill low-volume noise
-                    insert_alert(
-                        asset_symbol=symbol,
-                        alert_type='volume_spike',
-                        severity='info',
-                        message=f"Message volume spike for {symbol}: {msg_count} messages (prev: {baseline})",
-                        details={
-                            'message_volume': msg_count,
-                            'mean_volume': baseline,
-                            'spike_ratio': float(round(msg_count / baseline, 2))
-                        },
-                        event_timestamp=start_time,
-                        backtest_id=None,
-                        session_id=self.session_id
-                    )
+                ):
                     alert_count += 1
                     
         # 5. Insert Batch Records
