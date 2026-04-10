@@ -6,8 +6,6 @@
   --bg-card-bottom: rgba(17, 24, 39, 0.95);
   --bg-overlay: rgba(255, 255, 255, 0.03);
   --bg-overlay-strong: rgba(255, 255, 255, 0.05);
-
-  /* Accent glows */
   --bg-glow-blue: rgba(59, 130, 246, 0.15);
   --bg-glow-red: rgba(239, 68, 68, 0.1);
 
@@ -52,9 +50,9 @@
   --size-1: 4px;
   --size-2: 8px;
   --size-3: 12px;
-  --size-3_5: 14px;
+  --size-3-5: 14px;
   --size-4: 16px;
-  --size-4_5: 18px;
+  --size-4-5: 18px;
   --size-5: 20px;
   --size-6: 24px;
   --size-7: 28px;
@@ -101,6 +99,11 @@ body {
   box-shadow: var(--shadow-card);
 }
 
+.flex-container {
+  display: flex;
+  justify-content: space-between;
+}
+
 .search-input,
 .card {
   border: 1px solid var(--border-subtle);
@@ -115,17 +118,17 @@ body {
 .search-input {
   width: 100%;
   padding: var(--size-3);
-  font-size: var(--size-4_5);
+  font-size: var(--size-4-5);
   color: var(--text-primary);
 }
 
+.btn-secondary:hover,
 .search-input:hover,
 .select:hover {
   border-color: var(--info);
 }
 
 .card {
-  position: relative;
   padding: var(--size-4) var(--size-5);
   transition: all var(--transition-base);
 }
@@ -157,36 +160,41 @@ body {
   gap: var(--size-3);
 }
 
-.select,
-.btn {
+select,
+button,
+input {
   height: 40px;
-  padding: 0 var(--size-3_5);
-  font-size: var(--size-3_5);
+  padding: 0 var(--size-3-5);
+  font-size: var(--size-3-5);
   border-radius: var(--size-3);
   color: var(--text-primary);
   cursor: pointer;
   transition: all var(--transition-base);
 }
 
+input[type="date"] {
+  color-scheme: dark;
+}
+
+.btn-secondary,
 .select {
   border: 1px solid var(--border-soft);
   background: var(--bg-surface);
 }
 
-.select:focus,
-.btn:focus {
+.select:focus {
   border-color: var(--info);
   box-shadow: 0 0 0 4px var(--info);
 }
 
-.btn {
+.btn-primary {
   padding: 0 var(--size-5);
   font-weight: var(--font-bold);
   background: var(--info);
   border: none;
 }
 
-.btn:hover {
+.btn-primary:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-button);
 }
@@ -234,7 +242,7 @@ body {
 }
 
 .alert-symbol {
-  font-size: var(--size-4_5);
+  font-size: var(--size-4-5);
   font-weight: var(--font-bold-strong);
   color: var(--text-primary);
 }
@@ -323,8 +331,8 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: var(--size-4);
-  padding-top: var(--size-3_5);
-  font-size: var(--size-3_5);
+  padding-top: var(--size-3-5);
+  font-size: var(--size-3-5);
   color: var(--text-subtle);
   border-top: 1px solid var(--border-subtle);
 }

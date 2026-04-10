@@ -18,11 +18,12 @@ function App() {
 
   const [searchAsset, setSearchAsset] = useState("");
   const [startDate, setStartDate] = useState("");
-	const [endDate, setEndDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [error, setError] = useState("");
 
   // For alerts
   const [alerts, setAlerts] = useState([]);
+  const [limit, setLimit] = useState(10);
 
   //load asset list
   useEffect(() => {
@@ -61,31 +62,24 @@ function App() {
         ? `?backtest_id=${backtestId}&interval=1d`
         : `?session_id=${sessionId}`;
 
-  setError("");
-  setLoading(true);
-  setCorrelationData([]);
-
-    Promise.all([
-      api.get(`/correlation/${selectedAsset}${params}`, {
+    Promise.resolve()
+      .then(() => {
+        setError("");
+        setLoading(true);
+        setCorrelationData([]);
+        return api.get(`/correlation/${selectedAsset}${params}`, {
           signal: controller.signal,
-        }),
-         api.get(`/alerts?asset_symbol=${selectedAsset}&limit=10`,{
-          signal: controller.signal,
+        });
+      })
+      .then((res) => setCorrelationData(res.data.data || []))
+      .catch((err) => {
+        if (err.name !== "CanceledError" && err.code !== "ERR_CANCELED") {
+          setError("Failed to load chart data");
+        }
+      })
+      .finally(() => setLoading(false));
 
-         }),
-    ])    .then(([correlationRes, alertsRes]) => {
-      setCorrelationData(correlationRes.data.data || []);
-      setAlerts(alertsRes.data.data || []);
-    })
-    .catch((err) => {
-      if (err.name !== "CanceledError" && err.code !== "ERR_CANCELED") {
-        setError("Failed to load chart data");
-      }
-    })
-    .finally(() => setLoading(false));
-
-  return () => controller.abort();   
-
+    return () => controller.abort();
   }, [selectedAsset, mode, backtestId, sessionId]);
 
   //search assets
@@ -102,14 +96,14 @@ function App() {
     setSelectedAsset(symbol);
     setMode("backtest");
     setStartDate("");
-		setEndDate("");
+    setEndDate("");
   };
 
   const handleBack = () => {
     setSelectedAsset("");
     setCorrelationData([]);
     setStartDate("");
-		setEndDate("");
+    setEndDate("");
     setError("");
   };
 
@@ -117,9 +111,7 @@ function App() {
   const filteredCorrelationData = correlationData.filter((item) => {
     const itemDate = new Date(item.time_bucket);
 
-    const afterStart = startDate
-      ? itemDate >= new Date(startDate)
-      : true;
+    const afterStart = startDate ? itemDate >= new Date(startDate) : true;
 
     const beforeEnd = endDate
       ? itemDate <= new Date(endDate + "T23:59:59")
@@ -130,7 +122,30 @@ function App() {
 
   return (
     <div className="page-container">
-      <h1 className="title">HypeCheck</h1>
+      <div className="flex-container">
+        <h1 className="title">HypeCheck</h1>
+        {selectedAsset && (
+          <div className="flex-container">
+            <div className="mode-toggle">
+              <button
+                onClick={() => setMode("backtest")}
+                disabled={mode === "backtest"}
+              >
+                Backtest
+              </button>
+              <button
+                onClick={() => setMode("live")}
+                disabled={mode === "live" || !sessionId}
+              >
+                Live{!sessionId ? " (no session)" : ""}
+              </button>
+            </div>
+            <button className="btn-secondary" onClick={handleBack}>
+              ⬅ Back
+            </button>
+          </div>
+        )}
+      </div>
 
       {error && <p>{error}</p>}
 
@@ -154,38 +169,19 @@ function App() {
       {/*Chart*/}
       {selectedAsset && (
         <>
-          <div className="mode-toggle">
-            <button
-              onClick={() => setMode("backtest")}
-              disabled={mode === "backtest"}
-            >
-              Backtest
-            </button>
-            <button
-              onClick={() => setMode("live")}
-              disabled={mode === "live" || !sessionId}
-            >
-              Live{!sessionId ? " (no session)" : ""}
-            </button>
-          </div>
-
-          <DateRangeSelector
+          <Chart
+            selectedAsset={selectedAsset}
+            correlationData={correlationData}
+            loading={loading}
+            mode={mode}
             startDate={startDate}
             endDate={endDate}
             setStartDate={setStartDate}
             setEndDate={setEndDate}
           />
 
-          <Chart
-            selectedAsset={selectedAsset}
-            correlationData={correlationData}
-            loading={loading}
-            mode={mode}
-            onBack={handleBack}
-          />
-
-          <Alerts alertData={alerts} />
-          </>
+          <Alerts selectedAsset={selectedAsset} />
+        </>
       )}
     </div>
   );
