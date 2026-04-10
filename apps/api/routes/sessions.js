@@ -1,3 +1,17 @@
+/**
+ * Sessions Route — GET /api/sessions
+ *
+ * Returns live session records enriched with aggregated statistics via
+ * two LEFT JOINs against sentiment_price_correlation and alerts. Uses the
+ * same join strategy as the backtests route to compute summary metrics
+ * in a single SQL pass.
+ *
+ * Query Parameters:
+ *   limit  {number} Max rows to return (default 50, max 200).
+ *   status {string} Filter by session status ('running', 'completed', 'stopped', 'error').
+ *   id     {number} Filter by exact session ID.
+ */
+
 import express from "express";
 import { QueryTypes } from "sequelize";
 import sequelize, { hasDbConfig } from "../database/index.js";
@@ -5,6 +19,11 @@ import { parseLimit, parsePositiveInt, parseString } from "../utils/query.js";
 
 const router = express.Router();
 
+/**
+ * GET /api/sessions
+ * Returns live session records with joined correlation and alert statistics,
+ * ordered by session start time descending.
+ */
 router.get("/", async (req, res) => {
   if (!hasDbConfig || !sequelize) {
     return res.status(500).json({ error: "DATABASE_URL is not configured" });
@@ -14,6 +33,7 @@ router.get("/", async (req, res) => {
   const status = parseString(req.query.status);
   const id = parsePositiveInt(req.query.id);
 
+  // Build WHERE clause dynamically — only active filters are appended
   const conditions = [];
   const replacements = { limit };
 

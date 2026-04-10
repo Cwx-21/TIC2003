@@ -7,17 +7,21 @@
   "scripts": {
     "dev:web": "npm run dev --prefix apps/web",
     "dev:api": "npm run dev --prefix apps/api",
-    "dev:etl": "apps/etl/venv/bin/python apps/etl/main.py",
+    "dev:etl": "sh -c '[ -x apps/etl/venv/bin/python ] && exec apps/etl/venv/bin/python apps/etl/main.py || { echo \"ETL virtualenv missing. Run npm run setup:etl first.\" >&2; exit 1; }'",
     "docker:up": "docker-compose up --build",
     "docker:down": "docker-compose down",
     "setup:api": "cd apps/api && npm install",
     "setup:web": "cd apps/web && npm install",
-    "setup:etl": "python3 -m venv apps/etl/venv && apps/etl/venv/bin/pip install -r apps/etl/requirements.txt"
+    "setup:etl": "python3 -m venv apps/etl/venv && apps/etl/venv/bin/pip install -r apps/etl/requirements.txt",
+    "test:task2_5:unit": "npm run test:task2_5 --prefix apps/api",
+    "test:task2_6:unit": "npm run test:task2_5 --prefix apps/api",
+    "test:task2_7:unit": "npm run test:task2_5 --prefix apps/api"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "chartjs-plugin-zoom": "^2.2.0"
+    "chart.js": "^4.5.1",
+    "react-chartjs-2": "^5.3.1"
   }
 }

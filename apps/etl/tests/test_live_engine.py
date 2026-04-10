@@ -14,7 +14,7 @@ def mock_db_functions():
          patch('live_engine.fetch_previous_correlation') as mock_corr, \
          patch('live_engine.insert_aggregations_batch') as mock_insert_agg, \
          patch('live_engine.insert_correlations_batch') as mock_insert_corr, \
-         patch('alert_generator.insert_alert') as mock_insert_alert:
+         patch('live_engine.insert_alert') as mock_insert_alert:
          
         # Default mock returns
         mock_assets.return_value = [{'symbol': 'BTC'}, {'symbol': 'ETH'}]

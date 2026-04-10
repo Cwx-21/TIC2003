@@ -1,12 +1,11 @@
-// database/connection.js
-import { Sequelize } from "sequelize";
-import dotenv from "dotenv";
+/**
+ * Database Connection Re-export
+ *
+ * Provides a named alias for the Sequelize singleton so that schemas
+ * and other modules can import it as `db` without depending directly
+ * on the index module path. All callers share the same pool instance.
+ */
 
-dotenv.config();
-
-const sequelize = new Sequelize(process.env.DATABASE_URL, {
-  dialect: "postgres",
-  logging: false,
-});
+import sequelize from "./index.js";
 
 export default sequelize;

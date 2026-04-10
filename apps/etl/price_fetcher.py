@@ -1,21 +1,46 @@
+"""
+Price Fetcher
+
+Wraps the yfinance library to provide live and historical OHLCV price data
+for all tracked assets. Handles the symbol translation required for crypto
+tickers (e.g., 'BTC' → 'BTC-USD') and normalises yfinance DataFrame output
+into plain Python dicts for downstream consumption.
+
+No API key is required — yfinance fetches data from Yahoo Finance's public
+endpoints. Rate limiting should be respected by callers (e.g., 2-second
+delays between per-asset calls in the live price loop).
+"""
+
 import os
 import json
-from datetime import datetime
 
 
 def _load_assets_from_config():
-    """Fallback: loads assets from JSON config when DB is not available."""
+    """
+    Fallback: loads assets from JSON config when DB is not available.
+
+    Returns:
+        list[dict]: Asset definitions from config/assets.json.
+    """
     config_path = os.path.join(os.path.dirname(__file__), 'config', 'assets.json')
-    with open(config_path, 'r') as f:
+    with open(config_path, 'r', encoding='utf-8') as f:
         data = json.load(f)
     return data['assets']
 
 
 def get_yfinance_ticker(symbol, asset_type):
     """
-    Converts an asset symbol to a yfinance-compatible ticker.
-    - Stocks: use symbol as-is (e.g., 'TSLA', 'NVDA')
-    - Crypto: append '-USD' (e.g., 'BTC' → 'BTC-USD')
+    Converts an asset symbol to a yfinance-compatible ticker string.
+
+    Stocks use the symbol as-is (e.g., 'TSLA', 'NVDA').
+    Crypto symbols are suffixed with '-USD' (e.g., 'BTC' → 'BTC-USD').
+
+    Args:
+        symbol (str): Asset ticker symbol.
+        asset_type (str): Either 'crypto' or 'stock'.
+
+    Returns:
+        str: yfinance-compatible ticker string.
     """
     if asset_type == 'crypto':
         return f"{symbol}-USD"
@@ -24,8 +49,17 @@ def get_yfinance_ticker(symbol, asset_type):
 
 def get_live_price(symbol, assets=None):
     """
-    Fetches current live price via yfinance.
-    Works for both crypto and stocks.
+    Fetches the current market price for an asset via yfinance.
+
+    Resolves the asset type from the provided assets list (or falls back to
+    the config file) to apply the correct ticker translation.
+
+    Args:
+        symbol (str): Asset ticker (e.g., 'BTC', 'TSLA').
+        assets (list[dict], optional): Pre-loaded asset list. If None, loaded from config.
+
+    Returns:
+        float: Current closing price, or 0.0 if unavailable.
     """
     try:
         import yfinance as yf
@@ -58,17 +92,21 @@ def get_live_price(symbol, assets=None):
 
 def get_historical_ohlcv(symbol, asset_type, start_date, end_date):
     """
-    Fetches historical OHLCV data for a given asset via yfinance.
-    Works for both crypto and stocks — no API key required.
+    Fetches historical daily OHLCV data for an asset via yfinance.
+
+    Applies the appropriate ticker translation and returns normalised records
+    as a list of plain Python dicts, ready for batch insertion into
+    historical_prices via insert_historical_prices_batch().
 
     Args:
-        symbol: Asset symbol (e.g., 'BTC', 'TSLA')
-        asset_type: 'crypto' or 'stock'
-        start_date: datetime.date or str 'YYYY-MM-DD'
-        end_date: datetime.date or str 'YYYY-MM-DD'
+        symbol (str): Asset ticker (e.g., 'BTC', 'TSLA').
+        asset_type (str): 'crypto' or 'stock'.
+        start_date (str | datetime.date): Start date in 'YYYY-MM-DD' format or date object.
+        end_date (str | datetime.date): End date in 'YYYY-MM-DD' format or date object.
 
     Returns:
-        list of dicts: [{date, open, high, low, close, volume}, ...]
+        list[dict]: Daily records with keys: date, open, high, low, close, volume.
+                    Returns an empty list if no data is found or on error.
     """
     try:
         import yfinance as yf
@@ -119,5 +157,3 @@ def get_historical_ohlcv(symbol, asset_type, start_date, end_date):
 if __name__ == "__main__":
     # Quick test
     print(f"BTC Live: ${get_live_price('BTC')}")
-    # data = get_historical_ohlcv('BTC', 'crypto', None, '2022-01-01', '2022-01-10')
-    # print(f"BTC historical: {len(data)} records")
