@@ -89,8 +89,10 @@ function Chart({
 
   return (
     <div className="container">
-      <div className="header">
-        <h2>Showing chart for {selectedAsset}</h2>
+      <div className="flex-between">
+        <h2 style={{ alignContent: "center" }}>
+          Showing chart for {selectedAsset}
+        </h2>
         <DateRangeSelector
           startDate={startDate}
           endDate={endDate}
@@ -104,7 +106,7 @@ function Chart({
         <Line data={data} options={options} />
       )}
       {!loading && correlationData.length === 0 && (
-        <div className="alert-empty">{emptyMessage}</div>
+        <div className="empty-container">{emptyMessage}</div>
       )}
     </div>
   );
