@@ -16,7 +16,7 @@ function Chart({
   setStartDate,
   setEndDate,
   datePreset,
-	handleDatePresetChange,
+  handleDatePresetChange,
 }) {
   const rows = [...correlationData].reverse();
   const labels = rows.map((r) => r.time_bucket.slice(0, 10));
@@ -91,16 +91,15 @@ function Chart({
 
   return (
     <div className="container">
-      <div className="header">
+      <div className="flex-between"  style={{ marginBottom: "24px" }}>
         <h2>Showing chart for {selectedAsset}</h2>
-
         <DateRangeSelector
           startDate={startDate}
           endDate={endDate}
           setStartDate={setStartDate}
           setEndDate={setEndDate}
           datePreset={datePreset}
-					handleDatePresetChange={handleDatePresetChange}
+          handleDatePresetChange={handleDatePresetChange}
         />
       </div>
 
@@ -109,7 +108,7 @@ function Chart({
         <Line data={data} options={options} />
       )}
       {!loading && correlationData.length === 0 && (
-        <div className="alert-empty">{emptyMessage}</div>
+        <div className="empty-container">{emptyMessage}</div>
       )}
     </div>
   );

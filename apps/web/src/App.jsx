@@ -158,19 +158,21 @@ function App() {
   };
 
   return (
-    <div className="page-container">
-      <div className="flex-container">
+    <div className="layout">
+      <div className="flex-between">
         <h1 className="title">HypeCheck</h1>
         {selectedAsset && (
-          <div className="flex-container">
+          <div className="flex-between">
             <div className="mode-toggle">
               <button
+                className="toggle-button backtest"
                 onClick={() => setMode("backtest")}
                 disabled={mode === "backtest"}
               >
                 Backtest
               </button>
               <button
+                className="toggle-button live"
                 onClick={() => setMode("live")}
                 disabled={mode === "live" || !sessionId}
               >
