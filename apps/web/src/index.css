@@ -241,6 +241,7 @@ input {
   color: var(--text-muted);
   font-weight: var(--font-bold);
   margin-bottom: var(--size-1);
+  margin-right: var(--size-2);
 }
 
 .alert-header {
