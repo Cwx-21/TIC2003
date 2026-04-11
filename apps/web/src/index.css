@@ -349,3 +349,71 @@ input[type="date"] {
   border-radius: var(--size-4);
   padding: var(--size-8) var(--size-4);
 }
+
+.sentiment-table-wrapper {
+	margin-top: var(--size-4);
+	max-height: 320px;
+	overflow-y: auto;
+	border: 1px solid var(--border-subtle);
+	border-radius: var(--size-4);
+	background: linear-gradient(
+		180deg,
+		var(--bg-card-top),
+		var(--bg-card-bottom)
+	);
+	box-shadow: var(--shadow-card);
+}
+
+.sentiment-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.sentiment-table thead th {
+	position: sticky;
+	top: 0;
+	z-index: 1;
+	background: var(--bg-surface);
+	color: var(--text-primary);
+	font-size: var(--size-3-5);
+	font-weight: var(--font-bold-strong);
+	border-bottom: 1px solid var(--border-soft);
+}
+
+.sentiment-table th,
+.sentiment-table td {
+	padding: var(--size-3) var(--size-4);
+	text-align: left;
+	vertical-align: top;
+}
+
+.sentiment-table td {
+	color: var(--text-secondary);
+	border-bottom: 1px solid var(--border-subtle);
+}
+
+.sentiment-table tbody tr:hover {
+	background: var(--bg-overlay);
+}
+
+.sentiment-table th:last-child,
+.sentiment-table td:last-child {
+	width: 140px;
+	white-space: nowrap;
+}
+
+.sentiment-table td:last-child {
+	font-weight: var(--font-bold);
+	color: var(--text-primary);
+}
+
+.comment-link {
+	color: var(--text-secondary);
+	text-decoration: none;
+	transition: color var(--transition-base);
+}
+
+.comment-link:hover {
+	color: var(--info-text);
+	text-decoration: underline;
+}

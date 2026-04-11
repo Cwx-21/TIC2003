@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import api from "./utils/api";
 import SearchBar from "./components/SearchBar";
 import SectionCardAsset from "./components/SectionCardAsset";
-import DateRangeSelector from "./components/DateRangeSelector";
+import SentimentTable from "./components/SentimentTable";
 import Chart from "./components/Chart";
 import Alerts from "./components/Alerts";
 
@@ -190,6 +190,7 @@ function App() {
         <>
           {/*Asset Search*/}
           <SearchBar
+            title="Search"
             search={searchAsset}
             setSearch={setSearchAsset}
             placeholder="Search assets..."
@@ -201,6 +202,15 @@ function App() {
             onItemClick={handleAssetClick}
           />
         </>
+      )}
+
+      {/*Sentiment Table */}
+      {selectedAsset && (
+        <SentimentTable
+          title="Comments and Sentiment"
+          selectedAsset={selectedAsset}
+          backtestId={1}
+        />
       )}
 
       {/*Chart*/}

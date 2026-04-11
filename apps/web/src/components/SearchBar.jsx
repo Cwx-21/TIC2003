@@ -1,12 +1,18 @@
-function SearchBar({ placeholder, search, setSearch }) {
+function SearchBar({ title, placeholder, search, setSearch }) {
   return (
+    <div className='container'>
+        <div className='header'>
+          <h2>{title}</h2>
+        </div>
     <input
       type='text'
       placeholder={placeholder}
       className='search-input'
       value={search}
-      onChange={(e) => setSearch(e.target.value)}
-    />
+      onChange={(entry) => setSearch(entry.target.value)}
+      />
+  </div>
+    
   );
 }
 

@@ -67,4 +67,46 @@ router.get("/:symbol", async (req, res) => {
   }
 });
 
+router.get("/:symbol/logs", async (req, res) => {
+	const db = getDbOrError(res);
+	if (!db) return;
+
+	const symbol = normalizeSymbol(req.params.symbol);
+	const backtestId = parsePositiveInt(req.query.backtest_id);
+
+	if (!symbol) {
+		return res.status(400).json({ error: "Symbol is required" });
+	}
+
+	try {
+		const rows = await db.query(
+			`
+			SELECT
+				id,
+				content,
+				sentiment_score,
+				event_timestamp,
+        raw_metadata->>'url' AS url
+			FROM sentiment_logs
+			WHERE asset_symbol = :symbol
+			AND backtest_id = :backtestId
+			ORDER BY event_timestamp DESC
+			LIMIT 50
+			`,
+			{
+				type: QueryTypes.SELECT,
+				replacements: {
+					symbol,
+					backtestId,
+				},
+			}
+		);
+
+		return res.json({ data: rows });
+	} catch (error) {
+		console.error("Failed to load sentiment logs", error);
+		return res.status(500).json({ error: "Failed to load sentiment logs" });
+	}
+});
+
 export default router;
