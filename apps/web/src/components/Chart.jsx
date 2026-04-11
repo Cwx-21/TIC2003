@@ -15,6 +15,8 @@ function Chart({
   endDate,
   setStartDate,
   setEndDate,
+  datePreset,
+	handleDatePresetChange,
 }) {
   const rows = [...correlationData].reverse();
   const labels = rows.map((r) => r.time_bucket.slice(0, 10));
@@ -91,11 +93,14 @@ function Chart({
     <div className="container">
       <div className="header">
         <h2>Showing chart for {selectedAsset}</h2>
+
         <DateRangeSelector
           startDate={startDate}
           endDate={endDate}
           setStartDate={setStartDate}
           setEndDate={setEndDate}
+          datePreset={datePreset}
+					handleDatePresetChange={handleDatePresetChange}
         />
       </div>
 
