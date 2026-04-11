@@ -19,6 +19,7 @@ function App() {
   const [searchAsset, setSearchAsset] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [datePreset, setDatePreset] = useState("all");
   const [error, setError] = useState("");
 
   // For alerts
@@ -109,16 +110,52 @@ function App() {
 
   //date range selector
   const filteredCorrelationData = correlationData.filter((item) => {
-    const itemDate = new Date(item.time_bucket);
+    const itemDay = item.time_bucket.slice(0, 10);
 
-    const afterStart = startDate ? itemDate >= new Date(startDate) : true;
-
-    const beforeEnd = endDate
-      ? itemDate <= new Date(endDate + "T23:59:59")
-      : true;
+    const afterStart = startDate ? itemDay >= startDate : true;
+    const beforeEnd = endDate ? itemDay <= endDate : true;
 
     return afterStart && beforeEnd;
   });
+
+  //date presets
+  const handleDatePresetChange = (preset) => {
+    setDatePreset(preset);
+
+    if (!correlationData.length) return;
+
+    const sortedData = [...correlationData].sort(
+      (a, b) => new Date(a.time_bucket) - new Date(b.time_bucket)
+    );
+
+    const firstDate = sortedData[0].time_bucket.slice(0, 10);
+    const lastDate = sortedData[sortedData.length - 1].time_bucket.slice(0, 10);
+
+    if (preset === "all") {
+      setStartDate("");
+      setEndDate("");
+      return;
+    }
+
+    const end = new Date(lastDate);
+    const start = new Date(lastDate);
+
+    if (preset === "5y") {
+      start.setFullYear(start.getFullYear() - 5);
+    } else if (preset === "1y") {
+      start.setFullYear(start.getFullYear() - 1);
+    } else if (preset === "1m") {
+      start.setMonth(start.getMonth() - 1);
+    } else if (preset === "1d") {
+      start.setDate(start.getDate() - 1);
+    }
+
+    const formattedStart = start.toISOString().slice(0, 10);
+    const formattedEnd = end.toISOString().slice(0, 10);
+
+    setStartDate(formattedStart < firstDate ? firstDate : formattedStart);
+    setEndDate(formattedEnd);
+  };
 
   return (
     <div className="layout">
@@ -173,13 +210,15 @@ function App() {
         <>
           <Chart
             selectedAsset={selectedAsset}
-            correlationData={correlationData}
+            correlationData={filteredCorrelationData}
             loading={loading}
             mode={mode}
             startDate={startDate}
             endDate={endDate}
             setStartDate={setStartDate}
             setEndDate={setEndDate}
+            datePreset={datePreset}
+	          handleDatePresetChange={handleDatePresetChange}
           />
 
           <Alerts selectedAsset={selectedAsset} />

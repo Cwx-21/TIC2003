@@ -15,6 +15,8 @@ function Chart({
   endDate,
   setStartDate,
   setEndDate,
+  datePreset,
+	handleDatePresetChange,
 }) {
   const rows = [...correlationData].reverse();
   const labels = rows.map((r) => r.time_bucket.slice(0, 10));
@@ -98,6 +100,8 @@ function Chart({
           endDate={endDate}
           setStartDate={setStartDate}
           setEndDate={setEndDate}
+          datePreset={datePreset}
+					handleDatePresetChange={handleDatePresetChange}
         />
       </div>
 
