@@ -22,10 +22,6 @@ function App() {
   const [datePreset, setDatePreset] = useState("all");
   const [error, setError] = useState("");
 
-  // For alerts
-  const [alerts, setAlerts] = useState([]);
-  const [limit, setLimit] = useState(10);
-
   //load asset list
   useEffect(() => {
     api
@@ -125,7 +121,7 @@ function App() {
     if (!correlationData.length) return;
 
     const sortedData = [...correlationData].sort(
-      (a, b) => new Date(a.time_bucket) - new Date(b.time_bucket)
+      (a, b) => new Date(a.time_bucket) - new Date(b.time_bucket),
     );
 
     const firstDate = sortedData[0].time_bucket.slice(0, 10);
@@ -228,7 +224,7 @@ function App() {
             setStartDate={setStartDate}
             setEndDate={setEndDate}
             datePreset={datePreset}
-	          handleDatePresetChange={handleDatePresetChange}
+            handleDatePresetChange={handleDatePresetChange}
           />
 
           <Alerts selectedAsset={selectedAsset} />

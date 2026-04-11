@@ -106,11 +106,6 @@ body {
   background: var(--bg-secondary);
 }
 
-.toggle-button:disabled {
-  border-color: var(--info-text);
-  background: var(--bg-secondary);
-}
-
 .toggle-button.backtest {
   border-radius: var(--radius-md) 0px 0px var(--radius-md);
 }
@@ -139,6 +134,7 @@ body {
   padding: var(--size-3);
   font-size: var(--size-4);
   color: var(--text-primary);
+  margin-top: var(--size-4);
 }
 
 .toggle-button:hover,
@@ -146,6 +142,11 @@ body {
 .select:hover,
 .btn-secondary:hover {
   border-color: var(--border-soft);
+}
+
+.toggle-button:disabled {
+  border-color: var(--info-text);
+  background: var(--bg-secondary);
 }
 
 .header {
@@ -206,7 +207,7 @@ input {
 .card-list {
   display: flex;
   flex-direction: column;
-  gap: var(--size-4);
+  gap: var(--size-6);
   margin-top: var(--size-6);
 }
 
@@ -362,69 +363,69 @@ input {
 }
 
 .sentiment-table-wrapper {
-	margin-top: var(--size-4);
-	max-height: 320px;
-	overflow-y: auto;
-	border: 1px solid var(--border-subtle);
-	border-radius: var(--size-4);
-	background: linear-gradient(
-		180deg,
-		var(--bg-card-top),
-		var(--bg-card-bottom)
-	);
-	box-shadow: var(--shadow-card);
+  margin-top: var(--size-4);
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--size-4);
+  background: var(--bg-secondary);
 }
 
 .sentiment-table {
-	width: 100%;
-	border-collapse: collapse;
+  width: 100%;
+  border-collapse: collapse;
 }
 
 .sentiment-table thead th {
-	position: sticky;
-	top: 0;
-	z-index: 1;
-	background: var(--bg-surface);
-	color: var(--text-primary);
-	font-size: var(--size-3-5);
-	font-weight: var(--font-bold-strong);
-	border-bottom: 1px solid var(--border-soft);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--size-3-5);
+  font-weight: var(--font-bold-strong);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .sentiment-table th,
 .sentiment-table td {
-	padding: var(--size-3) var(--size-4);
-	text-align: left;
-	vertical-align: top;
+  padding: var(--size-3) var(--size-4);
+  text-align: left;
+  vertical-align: top;
 }
 
 .sentiment-table td {
-	color: var(--text-secondary);
-	border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .sentiment-table tbody tr:hover {
-	background: var(--bg-overlay);
+  background: var(--bg-overlay);
+}
+
+.sentiment-table tbody tr:last-child td {
+  background: var(--bg-overlay);
+  border-bottom: none;
 }
 
 .sentiment-table th:last-child,
 .sentiment-table td:last-child {
-	width: 140px;
-	white-space: nowrap;
+  width: 140px;
+  white-space: nowrap;
 }
 
 .sentiment-table td:last-child {
-	font-weight: var(--font-bold);
-	color: var(--text-primary);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
 }
 
 .comment-link {
-	color: var(--text-secondary);
-	text-decoration: none;
-	transition: color var(--transition-base);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-base);
 }
 
 .comment-link:hover {
-	color: var(--info-text);
-	text-decoration: underline;
+  color: var(--info-text);
+  text-decoration: underline;
 }
