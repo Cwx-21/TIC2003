@@ -17,7 +17,6 @@ function DateRangeSelector({
         <option value="5y">5 Years</option>
         <option value="1y">1 Year</option>
         <option value="1m">1 Month</option>
-        <option value="1d">1 Day</option>
       </select>
 
       <div>
