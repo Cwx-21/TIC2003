@@ -73,7 +73,6 @@ function App() {
 
   const handleBack = () => {
     setSelectedAsset("");
-    setCorrelationData([]);
     setStartDate("");
     setEndDate("");
     setError("");
