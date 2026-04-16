@@ -1,3 +1,20 @@
+/**
+ * Sentiment Route — GET /api/sentiment/:symbol
+ *
+ * Returns pre-computed sentiment aggregation records for a given asset.
+ * Each record represents a time-bucketed summary (avg + credibility-weighted
+ * average) computed by the SentimentAggregator or LiveProcessor.
+ *
+ * Route Parameters:
+ *   symbol      {string} Asset ticker (e.g., 'BTC', 'TSLA'). Required.
+ *
+ * Query Parameters:
+ *   limit        {number} Max rows to return (default 200, max 500).
+ *   interval     {string} Bucket interval filter ('1h', '4h', '1d', '1m').
+ *   backtest_id  {number} Filter by backtest run ID.
+ *   session_id   {number} Filter by live session ID.
+ */
+
 import express from "express";
 import { QueryTypes } from "sequelize";
 import { parseLimit, parseString, parsePositiveInt } from "../utils/query.js";
@@ -5,6 +22,11 @@ import { getDbOrError, normalizeSymbol } from "../utils/task2_2.js";
 
 const router = express.Router();
 
+/**
+ * GET /api/sentiment/:symbol
+ * Returns sentiment aggregation records for the specified asset, ordered
+ * by most recent time bucket first.
+ */
 router.get("/:symbol", async (req, res) => {
   const db = getDbOrError(res);
   if (!db) return;
@@ -19,6 +41,7 @@ router.get("/:symbol", async (req, res) => {
   const backtestId = parsePositiveInt(req.query.backtest_id);
   const sessionId = parsePositiveInt(req.query.session_id);
 
+  // asset_symbol is always required; bucket interval and run IDs are optional
   const conditions = ["asset_symbol = :symbol"];
   const replacements = { symbol, limit };
 

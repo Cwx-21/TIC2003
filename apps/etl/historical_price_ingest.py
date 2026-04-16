@@ -1,22 +1,34 @@
 """
-Historical Price Ingestion Script
+Historical Price Ingestion
 
 Fetches historical OHLCV data for all tracked assets using yfinance
-(free, no API key required) and inserts into the historical_prices table.
+(free, no API key required) and inserts records into the historical_prices table.
+
+Used as Step 1 of the backtest post-processing pipeline. The default date range
+covers the WallStreetBets 2022 CSV dataset (2022-01-01 to 2022-12-31), but an
+explicit range can be passed when the CSV processing step has already determined
+the actual date span of the input data.
+
+Insertion uses ON CONFLICT DO NOTHING on (asset_symbol, event_date), so this
+function is safe to re-run without creating duplicate records.
 """
 
-from datetime import datetime, date
 from db import fetch_active_assets, insert_historical_prices_batch
 from price_fetcher import get_historical_ohlcv
 
 
 def ingest_historical_prices(date_range=None):
     """
-    Fetches and inserts historical prices for all active assets.
-    
+    Fetches and inserts historical OHLCV prices for all active assets.
+
+    Iterates over each active asset, retrieves daily OHLCV records from
+    yfinance, and batch-inserts them into historical_prices. Assets with
+    no data returned are skipped with a warning.
+
     Args:
-        date_range: tuple of (start_date, end_date) as strings 'YYYY-MM-DD' or date objects.
-                    Defaults to 2022-01-01 to 2022-12-31 if not provided.
+        date_range (tuple[str, str], optional): A (start_date, end_date) pair
+            in 'YYYY-MM-DD' format or as date objects.
+            Defaults to ('2022-01-01', '2022-12-31') if not provided.
     """
     # Default date range covers the WallStreetBets 2022 CSV
     if date_range:
@@ -25,10 +37,10 @@ def ingest_historical_prices(date_range=None):
         start_date = '2022-01-01'
         end_date = '2022-12-31'
 
-    print(f"\n{'='*60}")
-    print(f"Historical Price Ingestion")
+    print("\n" + "=" * 60)
+    print("Historical Price Ingestion")
     print(f"Date Range: {start_date} → {end_date}")
-    print(f"{'='*60}")
+    print("=" * 60)
 
     # Fetch assets from DB (single source of truth)
     assets = fetch_active_assets()
@@ -60,28 +72,21 @@ def ingest_historical_prices(date_range=None):
         # Determine the source label
         source = 'yfinance'
 
-        # Build batch records: (asset_symbol, price_open, price_close, price_high, price_low, volume, event_date, source)
-        records = []
-        for day in ohlcv_data:
-            records.append((
-                symbol,
-                day['open'],
-                day['close'],
-                day['high'],
-                day['low'],
-                day['volume'],
-                day['date'],
-                source
-            ))
+        # Build batch tuples: (symbol, open, close, high, low, volume, date, source)
+        records = [
+            (symbol, day['open'], day['close'], day['high'],
+             day['low'], day['volume'], day['date'], source)
+            for day in ohlcv_data
+        ]
 
         inserted = insert_historical_prices_batch(records)
         total_inserted += inserted
         print(f"  Inserted {inserted} price records for {symbol}.")
 
-    print(f"\n{'='*60}")
-    print(f"Historical Price Ingestion Complete!")
+    print("\n" + "=" * 60)
+    print("Historical Price Ingestion Complete!")
     print(f"Total records inserted: {total_inserted}")
-    print(f"{'='*60}\n")
+    print("=" * 60 + "\n")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test tests/task_2_5.unit.test.js",
+    "test:task2_5": "node --test tests/task_2_5.unit.test.js"
   },
   "dependencies": {
     "cors": "^2.8.5",

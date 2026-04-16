@@ -212,6 +212,33 @@ This document outlines the database schema architecture for the HypeCheck system
 
 ---
 
+### 3.5 `stream_ingestion_events` (Generic Streaming Landing Zone)
+
+**Purpose:** Stores structured, semi-structured, and unstructured payloads from future streaming sources before deeper downstream transformation. This table is designed to keep raw payload fidelity while still supporting indexed operational queries.
+
+| Column                | Type         | Constraints                                                           | Description                              |
+| :-------------------- | :----------- | :-------------------------------------------------------------------- | :--------------------------------------- |
+| `id`                  | SERIAL       | **PK**                                                                | Auto-increment ID                        |
+| `source`              | VARCHAR(100) | NOT NULL                                                              | Logical source/system name               |
+| `stream_name`         | VARCHAR(120) | NOT NULL, DEFAULT `'default'`                                         | Stream/topic name                        |
+| `format`              | VARCHAR(20)  | NOT NULL                                                              | Payload format (`json`, `csv`, `xml`)    |
+| `content_type`        | VARCHAR(120) | NOT NULL                                                              | Original HTTP/content type               |
+| `structure_kind`      | VARCHAR(20)  | NOT NULL, CHECK (`structured`, `semi_structured`, `unstructured`)     | Payload classification                   |
+| `parser_key`          | VARCHAR(40)  | NOT NULL                                                              | Parser/factory implementation used       |
+| `payload_json`        | JSONB        |                                                                       | Normalized JSON representation           |
+| `payload_text`        | TEXT         |                                                                       | Raw text payload                         |
+| `payload_base64`      | TEXT         |                                                                       | Raw binary payload encoded as base64     |
+| `metadata`            | JSONB        | DEFAULT `'{}'`                                                        | Caller-provided metadata                 |
+| `original_size_bytes` | INT          | DEFAULT `0`                                                           | Original payload size                    |
+| `record_count`        | INT          | DEFAULT `1`                                                           | Parsed logical row/item count            |
+| `status`              | VARCHAR(20)  | DEFAULT `'accepted'`, CHECK (`accepted`, `rejected`)                  | Ingestion status                         |
+| `received_at`         | TIMESTAMP    | DEFAULT `CURRENT_TIMESTAMP`                                           | Time accepted by API                     |
+| `created_at`          | TIMESTAMP    | DEFAULT `CURRENT_TIMESTAMP`                                           | Record creation time                     |
+
+**Indexes:** `(source, received_at)`, `(format, received_at)`, `(structure_kind, received_at)`
+
+---
+
 ## 4. Index Summary
 
 | Table                         | Index                                  | Columns                                        |
@@ -231,8 +258,11 @@ This document outlines the database schema architecture for the HypeCheck system
 | `sentiment_price_correlation` | `idx_correlation_session`              | `(session_id)`                                 |
 | `alerts`                      | `idx_alerts_asset_time`                | `(asset_symbol, event_timestamp DESC)`         |
 | `alerts`                      | `idx_alerts_type`                      | `(alert_type, created_at DESC)`                |
+| `stream_ingestion_events`     | `idx_stream_ingestion_source_time`     | `(source, received_at DESC)`                   |
+| `stream_ingestion_events`     | `idx_stream_ingestion_format_time`     | `(format, received_at DESC)`                   |
+| `stream_ingestion_events`     | `idx_stream_ingestion_structure_time`  | `(structure_kind, received_at DESC)`           |
 
-**Total: 10 tables, 15 indexes**
+**Total: 11 tables, 18 indexes**
 
 ---
 

@@ -103,7 +103,7 @@ curl -i -X OPTIONS "http://localhost:3000/api/alerts" \
 Run pytest against Task 2.4 checks:
 
 ```bash
-apps/etl/venv/bin/python -m pytest task_2_4_tests -q
+pytest task_2_4_tests -q
 ```
 
 Optional environment variables:
@@ -117,7 +117,14 @@ Optional environment variables:
 Run the standalone checker:
 
 ```bash
-apps/etl/venv/bin/python task_2_4_tests/main.py
+python3 task_2_4_tests/main.py
+```
+
+Recommended order:
+
+```bash
+python3 task_2_4_tests/main.py
+pytest task_2_4_tests -q
 ```
 
 ### Edge-Case Checks
@@ -204,3 +211,5 @@ Optional base URL override:
 ```bash
 API_BASE_URL=http://localhost:3000 bash scripts/task_2_4_check.sh
 ```
+
+For the Task 2.5 streaming ingestion workflow, commands, and unit test, see `Task_2_5_Testing.md`.

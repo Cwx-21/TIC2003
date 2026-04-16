@@ -4,6 +4,13 @@ Correlation & Divergence Engine
 Joins sentiment_aggregations with historical_prices to compute the
 sentiment-price divergence. Generates alerts when divergence exceeds
 configurable thresholds.
+
+Divergence is defined as:
+    divergence = weighted_avg_sentiment - normalised_price_change_pct
+
+where price_change_pct is normalised to [-1, 1] relative to the maximum
+absolute daily change in the dataset. A positive divergence indicates
+bullish sentiment against a falling price; negative indicates the reverse.
 """
 
 import pandas as pd
@@ -22,23 +29,42 @@ VOLUME_SPIKE_THRESHOLD = 3.0     # message_volume > (mean * this) triggers a vol
 
 
 class CorrelationEngine:
+    """
+    Computes sentiment-price divergence and generates anomaly alerts for a backtest run.
+
+    For each asset, the engine:
+      1. Fetches pre-computed sentiment aggregations from sentiment_aggregations.
+      2. Fetches historical OHLCV data from historical_prices.
+      3. Joins both datasets on date and computes day-over-day price change.
+      4. Normalises price change to [-1, 1] and calculates divergence.
+      5. Batch-inserts correlation records into sentiment_price_correlation.
+      6. Generates divergence and volume-spike alerts where thresholds are exceeded.
+
+    Thresholds are configurable at instantiation for testability.
+    """
+
     def __init__(self, divergence_threshold=DIVERGENCE_THRESHOLD,
                  volume_spike_threshold=VOLUME_SPIKE_THRESHOLD):
+        """
+        Args:
+            divergence_threshold (float): Minimum abs(divergence) to trigger an alert.
+            volume_spike_threshold (float): Multiplier applied to mean volume for spike detection.
+        """
         self.divergence_threshold = divergence_threshold
         self.volume_spike_threshold = volume_spike_threshold
 
     def run(self, backtest_id, interval='1d'):
         """
         Computes correlation between sentiment and price for a backtest run.
-        
+
         Args:
-            backtest_id: ID of the backtest run.
-            interval: Time bucket interval to use (default '1d').
+            backtest_id (int): ID of the backtest run.
+            interval (str): Time bucket interval to use (default '1d').
         """
-        print(f"\n{'='*60}")
-        print(f"Correlation & Divergence Engine")
+        print("\n" + "=" * 60)
+        print("Correlation & Divergence Engine")
         print(f"Backtest ID: {backtest_id} | Interval: {interval}")
-        print(f"{'='*60}")
+        print("=" * 60)
 
         # Fetch aggregated sentiment data
         agg_data = fetch_aggregations_for_backtest(backtest_id, interval)
@@ -113,9 +139,10 @@ class CorrelationEngine:
             # Build correlation records for batch insert
             corr_records = []
             for _, row in merged.iterrows():
+                ts = row['time_bucket']
                 corr_records.append((
                     symbol,
-                    row['time_bucket'].to_pydatetime() if hasattr(row['time_bucket'], 'to_pydatetime') else row['time_bucket'],
+                    ts.to_pydatetime() if hasattr(ts, 'to_pydatetime') else ts,
                     interval,
                     float(round(row['avg_sentiment_score'], 6)) if pd.notna(row['avg_sentiment_score']) else 0.0,
                     float(round(row['weighted_avg_sentiment'], 6)) if pd.notna(row['weighted_avg_sentiment']) else 0.0,
@@ -135,14 +162,28 @@ class CorrelationEngine:
             alerts_generated = self._generate_alerts(merged, symbol, backtest_id)
             total_alerts += alerts_generated
 
-        print(f"\n{'='*60}")
-        print(f"Correlation Complete!")
+        print("\n" + "=" * 60)
+        print("Correlation Complete!")
         print(f"Total correlation records: {total_correlations}")
         print(f"Total alerts generated: {total_alerts}")
-        print(f"{'='*60}\n")
+        print("=" * 60 + "\n")
 
     def _generate_alerts(self, merged_df, symbol, backtest_id):
-        """Checks for divergence and volume spike anomalies and inserts alerts."""
+        """
+        Checks for divergence and volume spike anomalies and inserts alerts.
+
+        Divergence alerts fire when abs(divergence) exceeds divergence_threshold.
+        Volume spike alerts fire when a bucket's message_volume exceeds
+        volume_spike_threshold times the mean volume across all buckets.
+
+        Args:
+            merged_df (pd.DataFrame): Joined sentiment-price DataFrame for one asset.
+            symbol (str): Asset ticker.
+            backtest_id (int): Backtest run ID to attach to alert records.
+
+        Returns:
+            int: Total number of alerts inserted.
+        """
         alert_count = 0
 
         # 1. Divergence alerts
@@ -201,7 +242,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python correlation_engine.py <backtest_id>")
         sys.exit(1)
-    
+
     backtest_id = int(sys.argv[1])
     engine = CorrelationEngine()
     engine.run(backtest_id)

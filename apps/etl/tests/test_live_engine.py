@@ -1,7 +1,6 @@
 import pytest
-import pandas as pd
 from datetime import datetime, timezone, timedelta
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 # Import the class we want to test
 from live_engine import LiveProcessor

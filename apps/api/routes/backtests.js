@@ -1,3 +1,16 @@
+/**
+ * Backtests Route — GET /api/backtests
+ *
+ * Returns backtest run records enriched with aggregated statistics via
+ * two LEFT JOINs against sentiment_price_correlation and alerts. This
+ * avoids N+1 queries by computing summary metrics in a single SQL pass.
+ *
+ * Query Parameters:
+ *   limit  {number} Max rows to return (default 50, max 200).
+ *   status {string} Filter by run status ('running', 'completed', 'failed').
+ *   id     {number} Filter by exact backtest run ID.
+ */
+
 import express from "express";
 import { QueryTypes } from "sequelize";
 import sequelize, { hasDbConfig } from "../database/index.js";
@@ -5,20 +18,21 @@ import { parseLimit, parsePositiveInt, parseString } from "../utils/query.js";
 
 const router = express.Router();
 
+/**
+ * GET /api/backtests
+ * Returns backtest runs with joined correlation and alert statistics,
+ * ordered by creation time descending.
+ */
 router.get("/", async (req, res) => {
   if (!hasDbConfig || !sequelize) {
     return res.status(500).json({ error: "DATABASE_URL is not configured" });
   }
 
-  // /api/backtests?limit=10&status=completed&id=9001
   const limit = parseLimit(req.query.limit, 50, 200);
-  /* 
-  trims whitespace
-  returns null if empty or invalid
-  */
   const status = parseString(req.query.status);
   const id = parsePositiveInt(req.query.id);
 
+  // Build WHERE clause dynamically — only active filters are appended
   const conditions = [];
   const replacements = { limit };
 
