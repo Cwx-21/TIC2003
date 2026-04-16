@@ -1,40 +1,7 @@
-import { useEffect, useState } from "react";
-import api from "../utils/api";
-
-function SentimentTable({ selectedAsset, backtestId }) {
-	const [comments, setComments] = useState([]);
-	const [error, setError] = useState("");
-
-	useEffect(() => {
-		if (!selectedAsset) return;
-
-		const getComments = async () => {
-			try {
-				const response = await api.get(`/sentiment/${selectedAsset}/logs`, {
-					params: {
-						backtest_id: backtestId,
-					},
-                });
-
-				setComments(response.data.data || []);
-				setError("");
-			} catch (err) {
-				console.error(err);
-				setError("Failed to load comments");
-			}
-		};
-
-		getComments();
-	}, [selectedAsset, backtestId]);
-
+function SentimentTable({ selectedAsset, comments, error }) {
 	if (!selectedAsset) {
 		return null;
 	}
-
-	const normalComments = comments.filter((item) => item.content !== "Comment");
-	const commentPlaceholders = comments
-		.filter((item) => item.content === "Comment")
-		.slice(0, 3);
 
 	const displayedComments = comments.filter((item) => item.url);
 

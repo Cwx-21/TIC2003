@@ -6,6 +6,75 @@ import DateRangeSelector from "./DateRangeSelector";
 
 ChartJS.register(zoomPlugin);
 
+//behaviour of chart
+const chartOptions = {
+	responsive: true,
+	interaction: {
+		mode: "index",
+		intersect: false,
+		axis: "x",
+	},
+	scales: {
+		priceAxis: {
+			type: "linear",
+			position: "left",
+		},
+		sentimentAxis: {
+			type: "linear",
+			position: "right",
+			min: -1,
+			max: 1,
+			grid: {
+				drawOnChartArea: false,
+			},
+		},
+	},
+	plugins: {
+		zoom: {
+			pan: {
+				enabled: true,
+				mode: "x",
+			},
+			zoom: {
+				wheel: {
+					enabled: true,
+				},
+				pinch: {
+					enabled: true,
+				},
+				mode: "x",
+			},
+		},
+	},
+};
+
+//helper fucntion: create graph
+function buildGraph(correlationData) {
+	const rows = [...correlationData].reverse();
+
+	return {
+		labels: rows.map((r) => r.time_bucket.slice(0, 10)),
+		datasets: [
+			{
+				label: "Price",
+				data: rows.map((r) => r.price_at_bucket),
+				borderColor: "blue",
+				backgroundColor: "blue",
+				yAxisID: "priceAxis",
+				pointRadius: 0,
+			},
+			{
+				label: "Sentiment",
+				data: rows.map((r) => r.weighted_sentiment),
+				borderColor: "green",
+				backgroundColor: "green",
+				yAxisID: "sentimentAxis",
+				pointRadius: 0,
+			},
+		],
+	};
+}
+
 function Chart({
   selectedAsset,
   correlationData,
@@ -18,71 +87,7 @@ function Chart({
   datePreset,
   handleDatePresetChange,
 }) {
-  const rows = [...correlationData].reverse();
-  const labels = rows.map((r) => r.time_bucket.slice(0, 10));
-
-  const data = {
-    labels,
-    datasets: [
-      {
-        label: "Price",
-        data: rows.map((r) => r.price_at_bucket),
-        borderColor: "blue",
-        backgroundColor: "blue",
-        yAxisID: "priceAxis",
-        pointRadius: 0,
-      },
-      {
-        label: "Sentiment",
-        data: rows.map((r) => r.weighted_sentiment),
-        borderColor: "green",
-        backgroundColor: "green",
-        yAxisID: "sentimentAxis",
-        pointRadius: 0,
-      },
-    ],
-  };
-
-  const options = {
-    responsive: true,
-    interaction: {
-      mode: "index",
-      intersect: false,
-      axis: "x",
-    },
-    scales: {
-      priceAxis: {
-        type: "linear",
-        position: "left",
-      },
-      sentimentAxis: {
-        type: "linear",
-        position: "right",
-        min: -1,
-        max: 1,
-        grid: {
-          drawOnChartArea: false,
-        },
-      },
-    },
-    plugins: {
-      zoom: {
-        pan: {
-          enabled: true,
-          mode: "x",
-        },
-        zoom: {
-          wheel: {
-            enabled: true,
-          },
-          pinch: {
-            enabled: true,
-          },
-          mode: "x",
-        },
-      },
-    },
-  };
+  const chartData = buildGraph(correlationData);
 
   const emptyMessage =
     mode === "live"
@@ -105,7 +110,7 @@ function Chart({
 
       {loading && <p>Loading...</p>}
       {!loading && correlationData.length > 0 && (
-        <Line data={data} options={options} />
+        <Line data={chartData} options={chartOptions} />
       )}
       {!loading && correlationData.length === 0 && (
         <div className="empty-container">{emptyMessage}</div>

@@ -11,7 +11,7 @@ function DateRangeSelector({
       <select
         className="select"
         value={datePreset}
-        onChange={(entry) => handleDatePresetChange(entry.target.value)}
+        onChange={(event) => handleDatePresetChange(event.target.value)}
       >
         <option value="all">All Time</option>
         <option value="5y">5 Years</option>
@@ -25,7 +25,7 @@ function DateRangeSelector({
           type="date"
           className="select"
           value={startDate}
-          onChange={(entry) => setStartDate(entry.target.value)}
+          onChange={(event) => setStartDate(event.target.value)}
         />
       </div>
 
@@ -35,7 +35,7 @@ function DateRangeSelector({
           className="select"
           type="date"
           value={endDate}
-          onChange={(entry) => setEndDate(entry.target.value)}
+          onChange={(event) => setEndDate(event.target.value)}
         />
       </div>
 

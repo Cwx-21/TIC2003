@@ -9,7 +9,7 @@ function SearchBar({ title, placeholder, search, setSearch }) {
       placeholder={placeholder}
       className='search-input'
       value={search}
-      onChange={(entry) => setSearch(entry.target.value)}
+      onChange={(event) => setSearch(event.target.value)}
       />
   </div>
     
