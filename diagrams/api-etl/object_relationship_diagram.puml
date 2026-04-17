@@ -1,0 +1,218 @@
+@startuml object_relationship_diagram
+title HypeCheck ETL Pipeline — Object Relationship Diagram\n(visibility modifiers and association multiplicities)
+
+left to right direction
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 11
+skinparam classBackgroundColor #F5F8FF
+skinparam classBorderColor #3366CC
+skinparam arrowColor #445566
+skinparam arrowThickness 1.5
+skinparam shadowing false
+skinparam nodesep 30
+skinparam ranksep 80
+skinparam dpi 150
+skinparam classArrowFontSize 12
+skinparam classArrowFontStyle bold
+skinparam packageStyle rectangle
+
+' ══════════════════════════════════════════════
+'  SCOPE TABLES — left column
+' ══════════════════════════════════════════════
+
+package "Scope Tables" #E8F5F9 {
+
+    class Asset {
+        + symbol      : VARCHAR(20)  <<PK>>
+        + name        : VARCHAR(100)
+        + type        : VARCHAR(10)
+        # keywords    : JSONB
+        # subreddits  : JSONB
+    }
+
+    class BacktestRun {
+        + id              : SERIAL  <<PK>>
+        + name            : VARCHAR(200)
+        + dataset_source  : VARCHAR(100)
+        + status          : VARCHAR(20)
+        + start_time      : TIMESTAMP
+        + end_time        : TIMESTAMP
+        # parameters      : JSONB
+        - total_rows      : INT
+        - processed_rows  : INT
+        - error_count     : INT
+    }
+
+    class LiveSession {
+        + id                       : SERIAL  <<PK>>
+        + name                     : VARCHAR(200)
+        + status                   : VARCHAR(20)
+        # channels_monitored        : JSONB
+        # assets_tracked            : JSONB
+        + started_at               : TIMESTAMP
+        + ended_at                 : TIMESTAMP
+        - total_messages_processed : INT
+        # parameters               : JSONB
+    }
+
+    ' Lock vertical order within left column
+    Asset       -[hidden]down- BacktestRun
+    BacktestRun -[hidden]down- LiveSession
+}
+
+' ══════════════════════════════════════════════
+'  FACT / LOG TABLES — right column
+' ══════════════════════════════════════════════
+
+package "Fact / Log Tables" #FFFBEE {
+
+    class SentimentLog {
+        + id               : SERIAL  <<PK>>
+        + asset_symbol     : VARCHAR(20)  <<FK>>
+        + source           : VARCHAR(50)
+        + content          : TEXT
+        + sentiment_score  : FLOAT
+        + credibility_score: FLOAT
+        + event_timestamp  : TIMESTAMP
+        + author_id        : VARCHAR(100)
+        # raw_metadata     : JSONB
+        - backtest_id      : INT  <<FK>>
+        - session_id       : INT  <<FK>>
+    }
+
+    class HistoricalPrice {
+        + id           : SERIAL  <<PK>>
+        + asset_symbol : VARCHAR(20)  <<FK>>
+        + event_date   : DATE
+        + price_open   : FLOAT
+        + price_close  : FLOAT
+        + price_high   : FLOAT
+        + price_low    : FLOAT
+        + volume       : BIGINT
+        + source       : VARCHAR(50)
+    }
+
+    class PriceHistory {
+        + id              : SERIAL  <<PK>>
+        + asset_symbol    : VARCHAR(20)  <<FK>>
+        + price           : FLOAT
+        + currency        : VARCHAR(10)
+        + event_timestamp : TIMESTAMP
+        - backtest_id     : INT  <<FK>>
+        - session_id      : INT  <<FK>>
+    }
+
+    class SentimentAggregation {
+        + id                    : SERIAL  <<PK>>
+        + asset_symbol          : VARCHAR(20)  <<FK>>
+        + time_bucket           : TIMESTAMP
+        + bucket_interval       : VARCHAR(5)
+        # avg_sentiment_score   : FLOAT
+        # weighted_avg_sentiment: FLOAT
+        + message_volume        : INT
+        - backtest_id           : INT  <<FK>>
+        - session_id            : INT  <<FK>>
+    }
+
+    class SentimentPriceCorrelation {
+        + id                         : SERIAL  <<PK>>
+        + asset_symbol               : VARCHAR(20)  <<FK>>
+        + time_bucket                : TIMESTAMP
+        + bucket_interval            : VARCHAR(5)
+        # avg_sentiment              : FLOAT
+        # weighted_sentiment         : FLOAT
+        + price_at_bucket            : FLOAT
+        + price_change_pct           : FLOAT
+        - sentiment_price_divergence : FLOAT
+        + message_volume             : INT
+        - backtest_id                : INT  <<FK>>
+        - session_id                 : INT  <<FK>>
+    }
+
+    class Alert {
+        + id               : SERIAL  <<PK>>
+        + asset_symbol     : VARCHAR(20)  <<FK>>
+        + alert_type       : VARCHAR(50)
+        + severity         : VARCHAR(20)
+        + message          : TEXT
+        # details          : JSONB
+        + event_timestamp  : TIMESTAMP
+        - is_acknowledged  : BOOLEAN
+        - backtest_id      : INT  <<FK>>
+        - session_id       : INT  <<FK>>
+    }
+
+    class AuthorCredibility {
+        + author_id           : VARCHAR(100)  <<PK>>
+        + source              : VARCHAR(50)   <<PK>>
+        + baseline_credibility: FLOAT
+        + total_posts         : INT
+        - spam_flags          : INT
+        - is_bot              : BOOLEAN
+        + last_evaluated_at   : TIMESTAMP
+    }
+
+    ' Lock vertical order within right column
+    SentimentLog             -[hidden]down- HistoricalPrice
+    HistoricalPrice          -[hidden]down- PriceHistory
+    PriceHistory             -[hidden]down- SentimentAggregation
+    SentimentAggregation     -[hidden]down- SentimentPriceCorrelation
+    SentimentPriceCorrelation -[hidden]down- Alert
+    Alert                    -[hidden]down- AuthorCredibility
+}
+
+' ══════════════════════════════════════════════
+'  STANDALONE — ingestion landing zone
+' ══════════════════════════════════════════════
+
+class StreamIngestionEvent {
+    + id              : SERIAL  <<PK>>
+    + source          : VARCHAR(100)
+    + stream_name     : VARCHAR(100)
+    + format          : VARCHAR(20)
+    + structure_kind  : VARCHAR(20)
+    + parser_key      : VARCHAR(50)
+    # payload_json    : JSONB
+    + payload_text    : TEXT
+    - payload_hash    : VARCHAR(64)
+    + status          : VARCHAR(20)
+    + received_at     : TIMESTAMP
+    - original_size_bytes : INT
+    - record_count    : INT
+}
+
+' ══════════════════════════════════════════════
+'  1-to-MANY RELATIONSHIPS
+'  Labels omitted — FK columns inside each
+'  fact table already name the parent table.
+' ══════════════════════════════════════════════
+
+Asset       "1" --o "0..*" SentimentLog
+Asset       "1" --o "0..*" HistoricalPrice
+Asset       "1" --o "0..*" PriceHistory
+Asset       "1" --o "0..*" SentimentAggregation
+Asset       "1" --o "0..*" SentimentPriceCorrelation
+Asset       "1" --o "0..*" Alert
+
+BacktestRun "1" --o "0..*" SentimentLog
+BacktestRun "1" --o "0..*" PriceHistory
+BacktestRun "1" --o "0..*" SentimentAggregation
+BacktestRun "1" --o "0..*" SentimentPriceCorrelation
+BacktestRun "1" --o "0..*" Alert
+
+LiveSession "1" --o "0..*" SentimentLog
+LiveSession "1" --o "0..*" PriceHistory
+LiveSession "1" --o "0..*" SentimentAggregation
+LiveSession "1" --o "0..*" SentimentPriceCorrelation
+LiveSession "1" --o "0..*" Alert
+
+' ══════════════════════════════════════════════
+'  MANY-TO-MANY & DERIVED ASSOCIATION
+' ══════════════════════════════════════════════
+
+AuthorCredibility "0..*" -- "0..*" SentimentLog : M:N via author_id
+
+SentimentAggregation "0..*" --> "0..*" SentimentPriceCorrelation : feeds into
+
+@enduml

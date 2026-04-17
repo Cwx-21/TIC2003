@@ -1,0 +1,173 @@
+@startuml hypecheck_architecture
+title HypeCheck — Architecture & Component Diagram (Tasks 2.1–2.7)
+
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontSize 11
+
+package "Frontend (React + Vite : 5173)" {
+  class Dashboard
+}
+
+package "Express API (Node.js : 3000)" {
+  class ApiServer
+  package "Routes" {
+    class AssetsRoute
+    class SentimentRoute
+    class PricesRoute
+    class CorrelationRoute
+    class BacktestsRoute
+    class SessionsRoute
+    class AlertsRoute
+    class StreamsRoute <<Task 2.5>>
+    class TweetStreamRoute <<Task 2.6/2.7>>
+  }
+  package "Middleware" {
+    class CorsMiddleware <<Task 2.4>>
+    class RateLimitMiddleware <<Task 2.4>>
+    class TweetSignatureMiddleware <<Task 2.7>>
+  }
+}
+
+package "Task 2.5–2.7 Streaming Layer" {
+  class StreamIngestionFacade <<Facade>>
+  class StreamParserFactory <<Factory>>
+  class StreamEventRepository <<Repository>>
+
+  package "Parsers (Strategy)" {
+    class BaseStreamParser <<abstract>>
+    class JsonStreamParser
+    class CsvStreamParser
+    class XmlStreamParser
+    class TextStreamParser
+    class SpreadsheetBinaryParser
+    class TweetStreamParser <<Task 2.6, Template Method>>
+  }
+
+  package "Task 2.6 — Tweet Robustness" {
+    class TweetEnvelopeBuilder <<Builder>>
+    class TweetValidationChain <<Chain of Responsibility>>
+    class RetryingStreamIngestionFacade <<Decorator>>
+  }
+
+  package "Task 2.7 — CIA Security" {
+    class BaseSignatureVerifier <<abstract, Strategy>>
+    class HmacSignatureVerifier <<Strategy>>
+    class NullSignatureVerifier <<Null Object>>
+    class CryptoUtils
+  }
+}
+
+package "ETL Pipeline (Python 3)" {
+  class BacktestRunner <<Pipeline>>
+  class LiveProcessor <<Observer Subject>>
+  class AlertObserver <<abstract>>
+  class DatabaseAlertObserver <<Observer>>
+  class TelegramMonitor
+}
+
+database "PostgreSQL 15" as Postgres {
+  class assets
+  class sentiment_logs
+  class sentiment_aggregations
+  class historical_prices
+  class sentiment_price_correlation
+  class alerts
+  class backtest_runs
+  class live_sessions
+  class author_credibility
+  class stream_ingestion_events <<payload_hash>>
+}
+
+' --- Frontend
+Dashboard --> ApiServer : HTTP REST
+
+' --- Middleware chain
+ApiServer --> CorsMiddleware
+ApiServer --> RateLimitMiddleware
+TweetStreamRoute --> TweetSignatureMiddleware
+
+' --- Routes
+ApiServer --> AssetsRoute
+ApiServer --> SentimentRoute
+ApiServer --> PricesRoute
+ApiServer --> CorrelationRoute
+ApiServer --> BacktestsRoute
+ApiServer --> SessionsRoute
+ApiServer --> AlertsRoute
+ApiServer --> StreamsRoute
+ApiServer --> TweetStreamRoute
+
+' --- Stream pipeline
+StreamsRoute --> StreamIngestionFacade : POST /ingest\nGET /events\nGET /health
+TweetStreamRoute --> TweetValidationChain : validate
+TweetStreamRoute --> TweetEnvelopeBuilder : build envelope
+TweetStreamRoute --> StreamIngestionFacade : ingest
+
+StreamIngestionFacade --> StreamParserFactory : getParser(format)
+StreamIngestionFacade --> StreamEventRepository : create / listRecent
+StreamIngestionFacade --> CryptoUtils : computePayloadHash()
+
+StreamParserFactory --> BaseStreamParser
+BaseStreamParser <|-- JsonStreamParser
+BaseStreamParser <|-- CsvStreamParser
+BaseStreamParser <|-- XmlStreamParser
+BaseStreamParser <|-- TextStreamParser
+BaseStreamParser <|-- SpreadsheetBinaryParser
+BaseStreamParser <|-- TweetStreamParser
+
+RetryingStreamIngestionFacade --> StreamIngestionFacade : wraps (Decorator)
+
+BaseSignatureVerifier <|-- HmacSignatureVerifier
+BaseSignatureVerifier <|-- NullSignatureVerifier
+TweetSignatureMiddleware --> BaseSignatureVerifier : strategy
+HmacSignatureVerifier --> CryptoUtils : verifyHmacSignature()
+
+StreamEventRepository --> stream_ingestion_events
+
+' --- DB routes
+AssetsRoute --> assets
+SentimentRoute --> sentiment_aggregations
+PricesRoute --> historical_prices
+CorrelationRoute --> sentiment_price_correlation
+BacktestsRoute --> backtest_runs
+SessionsRoute --> live_sessions
+AlertsRoute --> alerts
+
+' --- ETL
+LiveProcessor --> AlertObserver : notify observers
+AlertObserver <|-- DatabaseAlertObserver
+DatabaseAlertObserver --> alerts
+BacktestRunner --> sentiment_logs
+BacktestRunner --> historical_prices
+BacktestRunner --> sentiment_aggregations
+BacktestRunner --> sentiment_price_correlation
+TelegramMonitor --> LiveProcessor
+
+note right of StreamIngestionFacade
+  Facade (2.5): single ingest() entry point
+  coordinates validate → parse → persist
+end note
+
+note right of TweetStreamParser
+  Template Method (2.6):
+  parse() calls extractText(),
+  extractMetrics(), extractEntities()
+end note
+
+note bottom of TweetValidationChain
+  Chain of Responsibility (2.6):
+  RequiredFields → TextLength → Timestamp
+end note
+
+note right of NullSignatureVerifier
+  Null Object (2.7): dev-mode
+  pass-through — no null checks needed
+end note
+
+note bottom of stream_ingestion_events
+  payload_hash CHAR(64) — Task 2.7
+  SHA-256 for non-repudiation
+end note
+
+@enduml
