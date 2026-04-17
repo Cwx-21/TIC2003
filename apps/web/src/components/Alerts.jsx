@@ -29,6 +29,11 @@ export default function PriceAlerts({ selectedAsset }) {
     return () => controller.abort();
   };
 
+  const handleRefresh = () => {
+    const controller = new AbortController();
+    fetchAlerts(controller);
+  };
+
   useEffect(() => {
     const controller = new AbortController();
     fetchAlerts(controller);
@@ -53,7 +58,7 @@ export default function PriceAlerts({ selectedAsset }) {
               <option value="info">Info</option>
               <option value="critical">Critical</option>
             </select>
-            
+
             <select
               className="select"
               value={limit}
@@ -65,7 +70,7 @@ export default function PriceAlerts({ selectedAsset }) {
               <option value={5}>5</option>
             </select>
 
-            <button className="btn-primary" onClick={fetchAlerts}>
+            <button className="btn-primary" onClick={handleRefresh}>
               Refresh
             </button>
           </div>
@@ -113,7 +118,9 @@ export default function PriceAlerts({ selectedAsset }) {
                       />
                       <AlertDetailBox
                         title="Price Change %"
-                        content={alert.details.divergence?.toFixed(4) ?? "-"}
+                        content={
+                          alert.details.price_change_pct?.toFixed(4) ?? "-"
+                        }
                         styling={
                           (alert.details.price_change_pct ?? 0) < 0
                             ? "negative"

@@ -24,7 +24,7 @@ TIC2003/
 | **ETL Pipeline** | Python 3, VADER, Telethon, Pandas | Ingests social data, runs NLP, writes to PostgreSQL |
 | **Database**     | PostgreSQL 15                     | Central data warehouse (11 tables, 18 indexes)      |
 | **Backend API**  | Node.js, Express, Sequelize       | ORM models defined, REST endpoints in progress      |
-| **Frontend**     | React, Vite, Tailwind CSS         | Interactive dual-axis charts (Price vs. Sentiment)  |
+| **Frontend**     | React, Vite                       | Interactive dual-axis charts (Price vs. Sentiment)  |
 
 ### Database Schema (10 Tables)
 
