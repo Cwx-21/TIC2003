@@ -5,7 +5,7 @@ import api from "../utils/api";
 export default function PriceAlerts({ selectedAsset }) {
   const [alerts, setAlerts] = useState([]);
   const [severityFilter, setSeverityFilter] = useState("");
-  const [limit, setLimit] = useState(10);
+  const [limit, setLimit] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -72,11 +72,11 @@ export default function PriceAlerts({ selectedAsset }) {
         </div>
 
         {loading && alerts.length === 0 ? (
-          <div className="alert-empty">Loading alerts...</div>
+          <div className="empty-container">Loading alerts...</div>
         ) : error ? (
-          <div className="alert-empty">{error}</div>
+          <div className="empty-container">{error}</div>
         ) : alerts.length === 0 ? (
-          <div className="alert-empty">
+          <div className="empty-container">
             No alerts found for the selected filters.
           </div>
         ) : (
@@ -86,7 +86,7 @@ export default function PriceAlerts({ selectedAsset }) {
 
               return (
                 <div key={alert.id} className={`card alert ${severity}`}>
-                  <div className="alert-header-container">
+                  <div className="header">
                     <div className="alert-header">
                       <div className="alert-symbol">
                         {alert.asset_symbol || "Unknown Asset"}

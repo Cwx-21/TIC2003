@@ -1,36 +1,55 @@
-function DateRangeSelector({ startDate, endDate, setStartDate, setEndDate }) {
+function DateRangeSelector({
+  startDate,
+  endDate,
+  setStartDate,
+  setEndDate,
+  datePreset,
+  handleDatePresetChange,
+}) {
   return (
-    <div className="header">
+    <div className="select-controls">
+      <select
+        className="select"
+        value={datePreset}
+        onChange={(entry) => handleDatePresetChange(entry.target.value)}
+      >
+        <option value="all">All Time</option>
+        <option value="5y">5 Years</option>
+        <option value="1y">1 Year</option>
+        <option value="1m">1 Month</option>
+        <option value="1d">1 Day</option>
+      </select>
+
       <div>
-        <p>Start Date</p>
+        <label className="date-label">Start Date</label>
         <input
-          className="select"
           type="date"
+          className="select"
           value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
+          onChange={(entry) => setStartDate(entry.target.value)}
         />
       </div>
 
       <div>
-        <p>End Date</p>
+        <label className="date-label">End Date</label>
         <input
           className="select"
           type="date"
           value={endDate}
-          onChange={(e) => setEndDate(e.target.value)}
+          onChange={(entry) => setEndDate(entry.target.value)}
         />
       </div>
-      <div style={{ marginTop: "18px" }}>
-        <button
-          className="btn-primary"
-          onClick={() => {
-            setStartDate("");
-            setEndDate("");
-          }}
-        >
-          Clear
-        </button>
-      </div>
+
+      <button
+        className="btn-primary"
+        onClick={() => {
+          setStartDate("");
+          setEndDate("");
+          handleDatePresetChange("all");
+        }}
+      >
+        Clear
+      </button>
     </div>
   );
 }
