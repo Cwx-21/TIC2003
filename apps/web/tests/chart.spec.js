@@ -25,22 +25,22 @@ async function mockCommonRoutes(page) {
 		});
 	});
 
-	await page.route("**/api/backtests/latest**", async (route) => {
+	await page.route("**/api/backtests", async (route) => {
 		await route.fulfill({
 			status: 200,
 			contentType: "application/json",
 			body: JSON.stringify({
-				data: { id: 1 },
+				data: [{ id: 1 }],
 			}),
 		});
 	});
 
-	await page.route("**/api/live-sessions/latest**", async (route) => {
+	await page.route("**/api/sessions?status=running", async (route) => {
 		await route.fulfill({
 			status: 200,
 			contentType: "application/json",
 			body: JSON.stringify({
-				data: { id: 2 },
+				data: [{ id: 2 }],
 			}),
 		});
 	});
