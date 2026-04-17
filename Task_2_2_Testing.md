@@ -80,7 +80,7 @@ curl -s -w '\nstatus=%{http_code}\n' "http://localhost:3000/api/correlation/BTC?
 ## 3) Pytest Checks (Task 2.2 Only)
 
 ```bash
-python3 -m pytest task_2_2_tests -q
+pytest task_2_2_tests -q
 ```
 
 Optional environment variables:
@@ -93,6 +93,8 @@ Optional environment variables:
 ```bash
 python3 task_2_4_tests/main.py
 ```
+
+For the new streaming-ingestion checks, see `Task_2_5_Testing.md`.
 
 ## Scripted Check (Task 2.2)
 

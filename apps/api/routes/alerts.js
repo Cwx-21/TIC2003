@@ -1,3 +1,19 @@
+/**
+ * Alerts Route — GET /api/alerts
+ *
+ * Returns alert records filtered by any combination of asset symbol,
+ * alert type, severity, backtest ID, and session ID. Conditions are
+ * composed dynamically so that absent filters do not narrow the result set.
+ *
+ * Query Parameters:
+ *   limit        {number}  Max rows to return (default 100, max 500).
+ *   asset_symbol {string}  Filter by asset ticker (e.g., 'BTC').
+ *   alert_type   {string}  Filter by type ('divergence', 'volume_spike', etc.).
+ *   severity     {string}  Filter by severity ('info', 'warning', 'critical').
+ *   backtest_id  {number}  Filter by backtest run ID.
+ *   session_id   {number}  Filter by live session ID.
+ */
+
 import express from "express";
 import { QueryTypes } from "sequelize";
 import sequelize, { hasDbConfig } from "../database/index.js";
@@ -5,6 +21,10 @@ import { parseLimit, parsePositiveInt, parseString } from "../utils/query.js";
 
 const router = express.Router();
 
+/**
+ * GET /api/alerts
+ * Returns paginated alert records ordered by most recent event timestamp.
+ */
 router.get("/", async (req, res) => {
   if (!hasDbConfig || !sequelize) {
     return res.status(500).json({ error: "DATABASE_URL is not configured" });
@@ -17,6 +37,7 @@ router.get("/", async (req, res) => {
   const backtestId = parsePositiveInt(req.query.backtest_id);
   const sessionId = parsePositiveInt(req.query.session_id);
 
+  // Build WHERE clause dynamically — only active filters are appended
   const conditions = [];
   const replacements = { limit };
 

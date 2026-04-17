@@ -1,3 +1,19 @@
+/**
+ * Prices Route — GET /api/prices/:symbol
+ *
+ * Returns historical OHLCV price records for a given asset, sourced from
+ * the historical_prices table (populated via yfinance during backtest runs).
+ *
+ * Route Parameters:
+ *   symbol     {string} Asset ticker (e.g., 'BTC', 'TSLA'). Required.
+ *
+ * Query Parameters:
+ *   limit      {number} Max rows to return (default 200, max 1000).
+ *   source     {string} Filter by data source (e.g., 'yfinance').
+ *   start_date {string} Inclusive lower bound for event_date ('YYYY-MM-DD').
+ *   end_date   {string} Inclusive upper bound for event_date ('YYYY-MM-DD').
+ */
+
 import express from "express";
 import { QueryTypes } from "sequelize";
 import { parseLimit, parseString } from "../utils/query.js";
@@ -5,6 +21,11 @@ import { getDbOrError, normalizeSymbol } from "../utils/task2_2.js";
 
 const router = express.Router();
 
+/**
+ * GET /api/prices/:symbol
+ * Returns historical price records for the specified asset, ordered by
+ * most recent date first.
+ */
 router.get("/:symbol", async (req, res) => {
   const db = getDbOrError(res);
   if (!db) return;
@@ -19,6 +40,7 @@ router.get("/:symbol", async (req, res) => {
   const startDate = parseString(req.query.start_date);
   const endDate = parseString(req.query.end_date);
 
+  // asset_symbol is always required; date range and source are optional
   const conditions = ["asset_symbol = :symbol"];
   const replacements = { symbol, limit };
 

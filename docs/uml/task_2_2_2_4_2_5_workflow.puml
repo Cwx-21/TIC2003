@@ -1,0 +1,44 @@
+@startuml
+title Task 2.2, Task 2.4, Task 2.5 Workflow
+
+start
+
+partition "Task 2.2" {
+  :Client requests /api/assets,\n/api/sentiment/:symbol,\n/api/prices/:symbol,\n/api/correlation/:symbol;
+  :Express routes validate query params;
+  :Read optimized PostgreSQL data;
+  :Return JSON payload for dashboard charts;
+}
+
+partition "Task 2.4" {
+  :Client requests /api/backtests,\n/api/sessions,\n/api/alerts;
+  :Apply CORS middleware;
+  :Apply rate-limit middleware;
+  :Route queries PostgreSQL tables;
+  :Return operational JSON responses;
+}
+
+partition "Task 2.5" {
+  :Client calls /api/streams/ingest;
+  :StreamsRoute builds request envelope;
+  :StreamIngestionFacade validates source,\nformat, content type;
+  :StreamParserFactory selects parser;
+  if (Format?) then (json/csv/xml/txt)
+    :Normalize structured or\nsemi-structured payload;
+  else (xls/xlsx/binary)
+    :Preserve binary payload as base64\nfor downstream processing;
+  endif
+  :StreamEventRepository stores event\nin stream_ingestion_events;
+  :Client checks /api/streams/health\nor /api/streams/events;
+}
+
+partition "Verification" {
+  :Run CLI scripts;
+  :Run Task 2.2 pytest;
+  :Run Task 2.5 unit tests;
+  :Run Task 2.5 pytest;
+  :Run Task 2.4 pytest last\n(rate limit check);
+}
+
+stop
+@enduml

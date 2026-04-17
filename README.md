@@ -19,12 +19,12 @@ TIC2003/
 
 ## Architecture
 
-| Layer            | Tech                                 | Role                                                |
-| :--------------- | :----------------------------------- | :-------------------------------------------------- |
-| **ETL Pipeline** | Python 3.12, VADER, Telethon, Pandas | Ingests social data, runs NLP, writes to PostgreSQL |
-| **Database**     | PostgreSQL 15                        | Central data warehouse (10 tables, 15 indexes)      |
-| **Backend API**  | Node.js 22, Express, Sequelize       | 7 REST endpoints live at `168.144.37.237/api`       |
-| **Frontend**     | React 19, Vite 7, Tailwind CSS       | Interactive dual-axis charts (Price vs. Sentiment)  |
+| Layer            | Tech                              | Role                                                |
+| :--------------- | :-------------------------------- | :-------------------------------------------------- |
+| **ETL Pipeline** | Python 3, VADER, Telethon, Pandas | Ingests social data, runs NLP, writes to PostgreSQL |
+| **Database**     | PostgreSQL 15                     | Central data warehouse (11 tables, 18 indexes)      |
+| **Backend API**  | Node.js, Express, Sequelize       | ORM models defined, REST endpoints in progress      |
+| **Frontend**     | React, Vite, Tailwind CSS         | Interactive dual-axis charts (Price vs. Sentiment)  |
 
 ### Database Schema (10 Tables)
 
@@ -32,9 +32,27 @@ TIC2003/
 | :-------------------- | :-------------------------------------------------------------------------------------- |
 | **Core Data**         | `assets`, `sentiment_logs`, `price_history`, `historical_prices`                        |
 | **Session Tracking**  | `backtest_runs`, `live_sessions`                                                        |
-| **Analysis & Output** | `author_credibility`, `sentiment_aggregations`, `sentiment_price_correlation`, `alerts` |
+| **Analysis & Output** | `author_credibility`, `sentiment_aggregations`, `sentiment_price_correlation`, `alerts`, `stream_ingestion_events` |
 
 > See [ETL_DB_SCHEMA.md](ETL_DB_SCHEMA.md) for full schema documentation.
+
+### Design Patterns
+
+| Pattern | Implementation | Location |
+| :------------- | :------------------------------------------------------------------------------ | :----------------------------------------------- |
+| **Facade** | `StreamIngestionFacade.ingest()` coordinates validation, parsing, and persistence behind a single entry point | `apps/api/services/streams/streamIngestionFacade.js` |
+| **Factory** | `StreamParserFactory.getParser(format)` selects the correct parser by format string without coupling callers to concrete classes | `apps/api/services/streams/streamParsers.js` |
+| **Strategy** | Each parser subclass (`JsonStreamParser`, `CsvStreamParser`, etc.) implements the same `parse()` interface, making formats interchangeable | `apps/api/services/streams/streamParsers.js` |
+| **Repository** | `StreamEventRepository` encapsulates all Sequelize ORM calls, keeping persistence logic out of the facade and route handlers | `apps/api/services/streams/streamEventRepository.js` |
+| **Observer** | `AlertObserver` / `DatabaseAlertObserver` decouple anomaly detection from `insert_alert` — `LiveProcessor` notifies registered observers rather than calling the DB directly | `apps/etl/live_engine.py` |
+| **Singleton** | One Sequelize connection pool (Node.js) and one psycopg2 `SimpleConnectionPool` (Python) are created once and shared across the process lifetime | `apps/api/database/index.js`, `apps/etl/db.py` |
+| **Pipeline** | `BacktestRunner.run()` executes three sequential post-processing stages (price ingestion → aggregation → correlation) after CSV ingest | `apps/etl/backtest_engine.py` |
+| **Template Method** | `TweetStreamParser.parse()` defines the fixed parsing skeleton; `extractText()`, `extractMetrics()`, `extractEntities()` are overridable hooks for subclass customisation | `apps/api/services/streams/streamParsers.js` |
+| **Chain of Responsibility** | `TweetRequiredFieldsValidator → TweetTextLengthValidator → TweetTimestampValidator` — each handler validates one rule and passes to the next, decoupling validation concerns | `apps/api/services/streams/streamIngestionFacade.js` |
+| **Builder** | `TweetEnvelopeBuilder` constructs the standard ingest envelope from a raw Twitter API v2 tweet object using fluent method chaining | `apps/api/services/streams/streamIngestionFacade.js` |
+| **Decorator** | `RetryingStreamIngestionFacade` wraps any facade instance with exponential-backoff retry logic for transient DB errors without modifying the wrapped class | `apps/api/services/streams/streamIngestionFacade.js` |
+| **Strategy** | `HmacSignatureVerifier` (production) and `NullSignatureVerifier` (development) implement the same `BaseSignatureVerifier` interface — active verifier selected at startup from `TWEET_WEBHOOK_SECRET` | `apps/api/middleware/tweetSignature.js` |
+| **Null Object** | `NullSignatureVerifier` satisfies the full Strategy interface while doing nothing — eliminates null-check branches in the route handler and prints a dev-mode warning | `apps/api/middleware/tweetSignature.js` |
 
 ### ETL Modes
 
@@ -49,8 +67,8 @@ TIC2003/
 
 ### Prerequisites
 
-- **Node.js** v22+
-- **Python** 3.12+
+- **Node.js** v18+
+- **Python** 3.9+
 - **Docker** (for PostgreSQL) or a local PostgreSQL 15 installation
 
 <details>
@@ -128,7 +146,7 @@ npm run dev:etl                              # Live mode (Telegram)
 
 #### What `--mode backtest --clear` Does
 
-1. Initializes the database schema (10 tables, 15 indexes, creates if not exist)
+1. Initializes the database schema (11 tables, 18 indexes, creates if not exist)
 2. Truncates all data tables (fresh start)
 3. Seeds the `assets` table from `config/assets.json`
 4. Creates a `backtest_runs` record with status tracking
@@ -160,42 +178,57 @@ All scripts are run from the **root** directory:
 | `npm run dev:api`                            | Starts the Express API (port 3000)                    |
 | `npm run dev:etl`                            | Starts the ETL in **Live Mode** (Telegram)            |
 | `npm run dev:etl -- --mode backtest --clear` | Starts the ETL in **Backtest Mode** (clears DB first) |
+| `npm run test:task2_5:unit`                  | Runs the Task 2.5 Node unit test                      |
 | `npm run setup:web`                          | Installs frontend dependencies                        |
 | `npm run setup:api`                          | Installs backend dependencies                         |
 | `npm run setup:etl`                          | Creates Python venv and installs requirements         |
 
-## Live Server
+## Task 2.5 Streaming Ingestion
 
-The backend API and database are deployed on a shared DigitalOcean Droplet. It can be use instead of running the full stack locally.
+Task 2.5 adds a generic PostgreSQL landing zone for future streaming payloads. The new API endpoints are:
 
-| What     | URL                                |
-| :------- | :--------------------------------- |
-| Frontend | `http://168.144.37.237`            |
-| API root | `http://168.144.37.237/api/assets` |
+- `GET /api/streams/health`
+- `POST /api/streams/ingest`
+- `GET /api/streams/events`
 
-**Available endpoints:**
+Supported formats:
 
-```
-GET /api/assets
-GET /api/sentiment/:symbol
-GET /api/prices/:symbol
-GET /api/correlation/:symbol
-GET /api/alerts
-GET /api/backtests
-GET /api/sessions
-```
+- `json`
+- `csv`
+- `xml`
+- `txt`
+- `xls`
+- `xlsx`
+- `binary`
 
-**Database access** (TablePlus / DBeaver / pgAdmin):
+### Stream Structure Classification
 
-- Host: `168.144.37.237` · Port: `5432` · User: `user` · Password: `password` · DB: `hypecheck`
+Every ingested payload is automatically classified into one of three structural tiers based on its format. The classification is set by each parser and stored in the `structure_kind` column of `stream_ingestion_events`. It can also be overridden by the caller via the `x-structure-kind` request header or `structure_kind` query parameter.
 
-**Frontend-only local dev** (no need to run Docker or API locally):
+| Structure Kind | Formats | Description |
+| :------------------ | :-------------------------- | :--------------------------------------------------------------- |
+| `structured` | `json`, `csv`, `xls`, `xlsx` | Fully parsed, machine-readable. Payload stored in `payload_json`. |
+| `semi_structured` | `xml` | Partially parsed — structural summary in `payload_json`, raw document in `payload_text`. |
+| `unstructured` | `txt`, `binary` | No structural parsing. Raw text in `payload_text` or Base64 bytes in `payload_base64`. |
 
-set axios request url to http://168.144.37.237
+### Files That Implement Structure Classification
 
-Then just run `npm run dev:web`.
+| File | Role |
+| :------------------------------------------------------------ | :----------------------------------------------------------------------------- |
+| `apps/api/utils/streaming.js` | Defines `STRUCTURE_BY_FORMAT` map and `inferStructureKind()` resolver |
+| `apps/api/services/streams/streamParsers.js` | Each parser subclass assigns `structure_kind` in its `parse()` result |
+| `apps/api/services/streams/streamIngestionFacade.js` | Resolves final `structure_kind` (caller override or parser default) before persistence |
+| `apps/api/services/streams/streamEventRepository.js` | Stores and filters records by `structure_kind` |
+| `apps/api/schemas/stream_ingestion_events.js` | Defines `structure_kind` column with `isIn` validation constraint |
+| `apps/api/routes/streams.js` | Exposes `structure_kind` as a filter on `GET /api/streams/events` |
+| `apps/etl/db.py` | Creates the `stream_ingestion_events` table with `structure_kind` CHECK constraint |
+| `apps/api/tests/task_2_5.unit.test.js` | Asserts `structure_kind` values in unit tests |
 
----
+Reference docs:
+
+- `Task_2_5_Testing.md`
+- `docs/uml/hypecheck_object_diagram.puml`
+- `docs/uml/task_2_2_2_4_2_5_workflow.puml`
 
 ## Tracked Assets
 

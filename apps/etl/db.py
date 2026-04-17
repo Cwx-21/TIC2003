@@ -1,3 +1,16 @@
+"""
+Database Access Layer
+
+Provides a singleton psycopg2 connection pool and all CRUD operations used
+by the ETL pipeline. All public functions acquire a connection from the pool,
+execute their query, commit (or rollback on error), and return the connection
+before exiting — ensuring the pool is never exhausted by a hung transaction.
+
+Implements the Singleton pattern for the connection pool via the module-level
+_pool variable and _get_pool() accessor. All callers share the same pool
+instance across the process lifetime.
+"""
+
 import os
 import psycopg2
 from psycopg2.extras import Json, execute_values
@@ -10,8 +23,18 @@ from datetime import datetime, timezone
 # ---------------------------------------------------------------------------
 _pool = None
 
+
 def _get_pool():
-    """Returns a singleton connection pool. Creates one if it doesn't exist."""
+    """
+    Returns the singleton connection pool, creating it on first access.
+
+    The pool is created with min=1 / max=10 connections against DATABASE_URL.
+    If the pool has been closed (e.g., after close_pool()), a new one is
+    instantiated on the next call.
+
+    Returns:
+        SimpleConnectionPool | None: The active pool, or None if creation failed.
+    """
     global _pool
     if _pool is None or _pool.closed:
         try:
@@ -25,8 +48,14 @@ def _get_pool():
             return None
     return _pool
 
+
 def get_db_connection():
-    """Gets a connection from the pool."""
+    """
+    Acquires a connection from the pool.
+
+    Returns:
+        psycopg2.connection | None: A checked-out connection, or None if unavailable.
+    """
     pool = _get_pool()
     if pool:
         try:
@@ -36,17 +65,29 @@ def get_db_connection():
             return None
     return None
 
+
 def release_connection(conn):
-    """Returns a connection back to the pool."""
+    """
+    Returns a connection back to the pool.
+
+    Args:
+        conn (psycopg2.connection): The connection to release.
+    """
     pool = _get_pool()
     if pool and conn:
         pool.putconn(conn)
+
 
 # ---------------------------------------------------------------------------
 # Schema Initialization
 # ---------------------------------------------------------------------------
 def init_db():
-    """Initializes the database tables if they don't exist."""
+    """
+    Creates all 11 tables and 18 indexes if they do not already exist.
+
+    Table creation order respects foreign key dependencies — assets is created
+    first as other tables reference it indirectly via asset_symbol.
+    """
     print("Initializing Database Schema...")
     conn = get_db_connection()
     if not conn:
@@ -208,6 +249,31 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """,
+        # 11. stream_ingestion_events — generic streaming payload landing zone
+        """
+        CREATE TABLE IF NOT EXISTS stream_ingestion_events (
+            id SERIAL PRIMARY KEY,
+            source VARCHAR(100) NOT NULL,
+            stream_name VARCHAR(120) NOT NULL DEFAULT 'default',
+            format VARCHAR(20) NOT NULL,
+            content_type VARCHAR(120) NOT NULL,
+            structure_kind VARCHAR(20) NOT NULL
+                CHECK (structure_kind IN ('structured', 'semi_structured', 'unstructured')),
+            parser_key VARCHAR(40) NOT NULL,
+            payload_json JSONB,
+            payload_text TEXT,
+            payload_base64 TEXT,
+            metadata JSONB DEFAULT '{}'::jsonb,
+            original_size_bytes INT DEFAULT 0,
+            record_count INT DEFAULT 1,
+            status VARCHAR(20) DEFAULT 'accepted'
+                CHECK (status IN ('accepted', 'rejected')),
+            -- SHA-256 hex digest stored for non-repudiation (Task 2.7)
+            payload_hash CHAR(64),
+            received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """,
     ]
 
     # --- Indexes ---
@@ -234,6 +300,10 @@ def init_db():
         "CREATE INDEX IF NOT EXISTS idx_sentiment_logs_source ON sentiment_logs(source);",
         # New: Composite for aggregation computation
         "CREATE INDEX IF NOT EXISTS idx_sentiment_logs_asset_source_time ON sentiment_logs(asset_symbol, source, event_timestamp DESC);",
+        # New: Streaming ingestion lookups
+        "CREATE INDEX IF NOT EXISTS idx_stream_ingestion_source_time ON stream_ingestion_events(source, received_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_stream_ingestion_format_time ON stream_ingestion_events(format, received_at DESC);",
+        "CREATE INDEX IF NOT EXISTS idx_stream_ingestion_structure_time ON stream_ingestion_events(structure_kind, received_at DESC);",
     ]
 
     try:
@@ -243,15 +313,24 @@ def init_db():
         for command in indexes:
             cur.execute(command)
         conn.commit()
-        print("Database initialized successfully (10 tables, 15 indexes).")
+        print("Database initialized successfully (11 tables, 18 indexes).")
     except Exception as e:
         print(f"Error creating tables: {e}")
         conn.rollback()
     finally:
         release_connection(conn)
 
+
 def seed_assets(assets_config):
-    """Seeds the assets table from the JSON config (upsert)."""
+    """
+    Upserts assets from the JSON config into the assets table.
+
+    Uses ON CONFLICT DO UPDATE so re-runs are idempotent — existing records
+    have their name, keywords, and subreddits refreshed without duplication.
+
+    Args:
+        assets_config (list[dict]): Asset entries from config/assets.json.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -283,11 +362,25 @@ def seed_assets(assets_config):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Backtest Run Management
 # ---------------------------------------------------------------------------
 def create_backtest_run(name, dataset_source, parameters, total_rows=None, start_time=None, end_time=None):
-    """Creates a backtest run record and returns its ID."""
+    """
+    Inserts a new backtest_runs record and returns its generated ID.
+
+    Args:
+        name (str): Human-readable label for the run.
+        dataset_source (str): Filename or identifier of the input dataset.
+        parameters (dict): Arbitrary run configuration stored as JSONB.
+        total_rows (int, optional): Expected total row count for progress tracking.
+        start_time (datetime, optional): Override for start_time column.
+        end_time (datetime, optional): Override for end_time column.
+
+    Returns:
+        int | None: The new backtest run ID, or None if insertion failed.
+    """
     conn = get_db_connection()
     if not conn: return None
 
@@ -311,8 +404,18 @@ def create_backtest_run(name, dataset_source, parameters, total_rows=None, start
     finally:
         release_connection(conn)
 
+
 def update_backtest_progress(backtest_id, processed_rows, error_count=0):
-    """Updates progress counters for a backtest run."""
+    """
+    Updates the processed_rows and error_count counters for a backtest run.
+
+    Called periodically during CSV processing to reflect incremental progress.
+
+    Args:
+        backtest_id (int): ID of the backtest run to update.
+        processed_rows (int): Number of rows successfully processed so far.
+        error_count (int): Cumulative number of rows that raised exceptions.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -329,8 +432,15 @@ def update_backtest_progress(backtest_id, processed_rows, error_count=0):
     finally:
         release_connection(conn)
 
+
 def complete_backtest_run(backtest_id, status='completed'):
-    """Marks a backtest run as completed or failed."""
+    """
+    Sets the final status and end_time for a backtest run.
+
+    Args:
+        backtest_id (int): ID of the backtest run.
+        status (str): One of 'completed' or 'failed'.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -347,11 +457,23 @@ def complete_backtest_run(backtest_id, status='completed'):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Live Session Management
 # ---------------------------------------------------------------------------
 def create_live_session(name, channels, assets_tracked, parameters=None):
-    """Creates a live session record and returns its ID."""
+    """
+    Inserts a new live_sessions record and returns its generated ID.
+
+    Args:
+        name (str): Human-readable session label (usually timestamped).
+        channels (list[str]): Telegram channel identifiers being monitored.
+        assets_tracked (list[str]): Asset symbols active in this session.
+        parameters (dict, optional): Arbitrary session config stored as JSONB.
+
+    Returns:
+        int | None: The new session ID, or None if insertion failed.
+    """
     conn = get_db_connection()
     if not conn: return None
 
@@ -375,8 +497,15 @@ def create_live_session(name, channels, assets_tracked, parameters=None):
     finally:
         release_connection(conn)
 
+
 def update_live_session_count(session_id, total_messages):
-    """Updates the total messages processed for a live session."""
+    """
+    Updates the total_messages_processed counter for a live session.
+
+    Args:
+        session_id (int): ID of the live session.
+        total_messages (int): Cumulative message count to persist.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -393,8 +522,15 @@ def update_live_session_count(session_id, total_messages):
     finally:
         release_connection(conn)
 
+
 def complete_live_session(session_id, status='completed'):
-    """Marks a live session as completed/stopped/error."""
+    """
+    Sets the final status and ended_at timestamp for a live session.
+
+    Args:
+        session_id (int): ID of the live session.
+        status (str): One of 'completed', 'stopped', or 'error'.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -411,11 +547,26 @@ def complete_live_session(session_id, status='completed'):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Sentiment Inserts
 # ---------------------------------------------------------------------------
 def insert_sentiment(symbol, source, content, sentiment, credibility, metadata, event_timestamp, backtest_id=None, session_id=None, author_id=None):
-    """Inserts a single sentiment record."""
+    """
+    Inserts a single sentiment record into sentiment_logs.
+
+    Args:
+        symbol (str): Asset ticker (e.g., 'BTC').
+        source (str): Data source identifier (e.g., 'telegram', 'reddit_backtest').
+        content (str): Raw text of the analysed message or post.
+        sentiment (float): VADER compound sentiment score in [-1.0, 1.0].
+        credibility (float): Author credibility score in [0.1, 0.99].
+        metadata (dict): Source-specific metadata (sender info, post score, etc.).
+        event_timestamp (datetime): UTC timestamp of the original event.
+        backtest_id (int, optional): Backtest run ID if in backtest mode.
+        session_id (int, optional): Live session ID if in live mode.
+        author_id (str, optional): Unique author identifier for credibility tracking.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -436,10 +587,18 @@ def insert_sentiment(symbol, source, content, sentiment, credibility, metadata, 
     finally:
         release_connection(conn)
 
+
 def insert_sentiment_batch(records):
     """
     Batch-inserts sentiment records using execute_values for high performance.
-    records: list of tuples (symbol, source, content, sentiment, credibility, metadata_dict, event_timestamp, backtest_id, session_id, author_id)
+
+    Flushes up to 500 rows per page to minimise round-trips. Metadata dicts
+    are serialised to psycopg2 Json objects before insertion.
+
+    Args:
+        records (list[tuple]): Each tuple contains:
+            (symbol, source, content, sentiment, credibility, metadata_dict,
+             event_timestamp, backtest_id, session_id, author_id)
     """
     if not records:
         return
@@ -471,11 +630,21 @@ def insert_sentiment_batch(records):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Price Inserts
 # ---------------------------------------------------------------------------
 def insert_price(symbol, price, event_timestamp, backtest_id=None, session_id=None):
-    """Inserts a price record."""
+    """
+    Inserts a live price snapshot into price_history.
+
+    Args:
+        symbol (str): Asset ticker.
+        price (float): Current market price in USD.
+        event_timestamp (datetime): UTC timestamp of the price observation.
+        backtest_id (int, optional): Backtest run ID.
+        session_id (int, optional): Live session ID.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -495,11 +664,25 @@ def insert_price(symbol, price, event_timestamp, backtest_id=None, session_id=No
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Author Credibility
 # ---------------------------------------------------------------------------
 def upsert_author_credibility(author_id, source, credibility_score, is_spam=False, is_bot=False):
-    """Upserts an author's credibility record — tracks reputation over time."""
+    """
+    Upserts an author's credibility record — tracks reputation over time.
+
+    On conflict, uses a running weighted average to update baseline_credibility,
+    increments total_posts and spam_flags accordingly, and latches is_bot to TRUE
+    permanently once set.
+
+    Args:
+        author_id (str): Unique author identifier.
+        source (str): Data source ('reddit' or 'telegram').
+        credibility_score (float): Score computed for the current post.
+        is_spam (bool): Whether the current post was flagged as spam.
+        is_bot (bool): Whether the author is identified as a bot.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -526,11 +709,18 @@ def upsert_author_credibility(author_id, source, credibility_score, is_spam=Fals
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Asset Queries
 # ---------------------------------------------------------------------------
 def fetch_active_assets():
-    """Fetches all active assets from the DB. Returns list of dicts."""
+    """
+    Fetches all active assets from the assets table.
+
+    Returns:
+        list[dict]: Each dict has keys: symbol, name, type, keywords.
+                    Returns an empty list on error or if no assets exist.
+    """
     conn = get_db_connection()
     if not conn: return []
 
@@ -546,14 +736,24 @@ def fetch_active_assets():
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Historical Price Inserts
 # ---------------------------------------------------------------------------
 def insert_historical_prices_batch(records):
     """
-    Batch-inserts historical OHLCV price records.
-    records: list of tuples (asset_symbol, price_open, price_close, price_high, price_low, volume, event_date, source)
-    Uses ON CONFLICT to safely handle re-runs.
+    Batch-inserts historical OHLCV price records into historical_prices.
+
+    Uses ON CONFLICT DO NOTHING on (asset_symbol, event_date) so re-runs
+    are safe — duplicate dates are silently skipped.
+
+    Args:
+        records (list[tuple]): Each tuple contains:
+            (asset_symbol, price_open, price_close, price_high,
+             price_low, volume, event_date, source)
+
+    Returns:
+        int: Number of rows actually inserted (0 on error).
     """
     if not records:
         return 0
@@ -584,13 +784,18 @@ def insert_historical_prices_batch(records):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Sentiment Log Queries (for aggregation)
 # ---------------------------------------------------------------------------
 def fetch_sentiment_logs_for_backtest(backtest_id):
     """
-    Fetches sentiment logs for a given backtest run.
-    Returns list of dicts with keys: asset_symbol, sentiment_score, credibility_score, event_timestamp.
+    Fetches all sentiment logs for a given backtest run, ordered by timestamp.
+
+    Returns:
+        list[dict]: Each dict has keys: asset_symbol, sentiment_score,
+                    credibility_score, event_timestamp.
+                    Returns an empty list on error.
     """
     conn = get_db_connection()
     if not conn: return []
@@ -615,9 +820,21 @@ def fetch_sentiment_logs_for_backtest(backtest_id):
     finally:
         release_connection(conn)
 
+
 def fetch_sentiment_logs_for_window(session_id, start_time, end_time):
     """
-    Fetches live sentiment logs for a specific time window within a given session.
+    Fetches live sentiment logs within a specific time window for a session.
+
+    Used by LiveProcessor to retrieve the messages processed in the last
+    60-second interval for aggregation and divergence computation.
+
+    Args:
+        session_id (int): Live session ID.
+        start_time (datetime): Inclusive window start (UTC).
+        end_time (datetime): Exclusive window end (UTC).
+
+    Returns:
+        list[dict]: Sentiment log records for the given window.
     """
     conn = get_db_connection()
     if not conn: return []
@@ -642,13 +859,18 @@ def fetch_sentiment_logs_for_window(session_id, start_time, end_time):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Aggregation Inserts & Queries
 # ---------------------------------------------------------------------------
 def insert_aggregations_batch(records):
     """
-    Batch-inserts sentiment aggregation records.
-    records: list of tuples (asset_symbol, time_bucket, bucket_interval, avg_sentiment_score, weighted_avg_sentiment, message_volume, backtest_id, session_id)
+    Batch-inserts pre-computed sentiment aggregation records.
+
+    Args:
+        records (list[tuple]): Each tuple contains:
+            (asset_symbol, time_bucket, bucket_interval, avg_sentiment_score,
+             weighted_avg_sentiment, message_volume, backtest_id, session_id)
     """
     if not records:
         return
@@ -675,10 +897,20 @@ def insert_aggregations_batch(records):
     finally:
         release_connection(conn)
 
+
 def fetch_aggregations_for_backtest(backtest_id, interval='1d'):
     """
-    Fetches sentiment aggregations for a given backtest and interval.
-    Returns list of dicts.
+    Fetches sentiment aggregations for a given backtest run and bucket interval.
+
+    Used by CorrelationEngine to retrieve pre-computed sentiment buckets before
+    joining them against historical price data.
+
+    Args:
+        backtest_id (int): Backtest run ID.
+        interval (str): Bucket interval label (e.g., '1h', '4h', '1d').
+
+    Returns:
+        list[dict]: Aggregation records ordered by asset and time bucket.
     """
     conn = get_db_connection()
     if not conn: return []
@@ -703,13 +935,17 @@ def fetch_aggregations_for_backtest(backtest_id, interval='1d'):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Historical Price Queries (for correlation)
 # ---------------------------------------------------------------------------
 def fetch_historical_prices_for_asset(symbol, start_date, end_date):
     """
-    Fetches historical prices for an asset within a date range.
-    Returns list of dicts with keys: event_date, price_open, price_close, price_high, price_low, volume.
+    Fetches historical OHLCV records for an asset within a date range.
+
+    Returns:
+        list[dict]: Each dict has keys: event_date, price_open, price_close,
+                    price_high, price_low, volume.
     """
     conn = get_db_connection()
     if not conn: return []
@@ -734,9 +970,20 @@ def fetch_historical_prices_for_asset(symbol, start_date, end_date):
     finally:
         release_connection(conn)
 
+
 def fetch_latest_price(symbol, session_id):
     """
     Fetches the most recent price snapshot for an asset in a live session.
+
+    Used by LiveProcessor to determine the current price when computing
+    sentiment-price divergence.
+
+    Args:
+        symbol (str): Asset ticker.
+        session_id (int): Live session ID.
+
+    Returns:
+        dict | None: Dict with keys 'price' and 'event_timestamp', or None.
     """
     conn = get_db_connection()
     if not conn: return None
@@ -764,14 +1011,19 @@ def fetch_latest_price(symbol, session_id):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Correlation Inserts
 # ---------------------------------------------------------------------------
 def insert_correlations_batch(records):
     """
-    Batch-inserts correlation records.
-    records: list of tuples (asset_symbol, time_bucket, bucket_interval, avg_sentiment, weighted_sentiment,
-                             price_at_bucket, price_change_pct, sentiment_price_divergence, message_volume, backtest_id, session_id)
+    Batch-inserts sentiment-price correlation records.
+
+    Args:
+        records (list[tuple]): Each tuple contains:
+            (asset_symbol, time_bucket, bucket_interval, avg_sentiment,
+             weighted_sentiment, price_at_bucket, price_change_pct,
+             sentiment_price_divergence, message_volume, backtest_id, session_id)
     """
     if not records:
         return
@@ -799,13 +1051,25 @@ def insert_correlations_batch(records):
     finally:
         release_connection(conn)
 
+
 def fetch_previous_correlation(symbol, session_id, interval='1m'):
     """
-    Fetches the most recent correlation record for an asset to calculate day-over-day changes.
+    Fetches the most recent correlation record for an asset in a live session.
+
+    Used by LiveProcessor to compute day-over-day price change percentage and
+    derive a baseline message volume for volume spike detection.
+
+    Args:
+        symbol (str): Asset ticker.
+        session_id (int): Live session ID.
+        interval (str): Bucket interval (default '1m' for live mode).
+
+    Returns:
+        dict | None: Most recent correlation row, or None if no prior record exists.
     """
     conn = get_db_connection()
     if not conn: return None
-    
+
     try:
         cur = conn.cursor()
         cur.execute(
@@ -829,11 +1093,24 @@ def fetch_previous_correlation(symbol, session_id, interval='1m'):
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Alert Inserts
 # ---------------------------------------------------------------------------
 def insert_alert(asset_symbol, alert_type, severity, message, details, event_timestamp, backtest_id=None, session_id=None):
-    """Inserts a single alert record."""
+    """
+    Inserts a single alert record into the alerts table.
+
+    Args:
+        asset_symbol (str): Asset ticker associated with the alert.
+        alert_type (str): One of 'divergence', 'volume_spike', 'sentiment_reversal', 'spam_surge'.
+        severity (str): One of 'info', 'warning', 'critical'.
+        message (str): Human-readable alert summary.
+        details (dict): Structured alert payload stored as JSONB.
+        event_timestamp (datetime): Timestamp of the event that triggered the alert.
+        backtest_id (int, optional): Backtest run ID if in backtest mode.
+        session_id (int, optional): Live session ID if in live mode.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -854,11 +1131,17 @@ def insert_alert(asset_symbol, alert_type, severity, message, details, event_tim
     finally:
         release_connection(conn)
 
+
 # ---------------------------------------------------------------------------
 # Clear Data
 # ---------------------------------------------------------------------------
 def clear_all_data():
-    """Truncates all data tables (preserves schema)."""
+    """
+    Truncates all data tables while preserving the schema and reference data.
+
+    Tables are truncated in child-first order to avoid FK constraint violations.
+    The assets table is intentionally excluded as it holds reference data.
+    """
     conn = get_db_connection()
     if not conn: return
 
@@ -883,8 +1166,10 @@ def clear_all_data():
     finally:
         release_connection(conn)
 
+
 def close_pool():
-    """Closes all connections in the pool. Call on shutdown."""
+    """
+    Closes all connections in the pool. Should be called on process shutdown."""
     global _pool
     if _pool and not _pool.closed:
         _pool.closeall()

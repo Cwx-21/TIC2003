@@ -1,3 +1,16 @@
+/**
+ * Assets Route — GET /api/assets
+ *
+ * Returns the master asset registry, optionally filtered by asset type,
+ * active status, or symbol. Results are ordered alphabetically by symbol.
+ *
+ * Query Parameters:
+ *   limit  {number}  Max rows to return (default 100, max 500).
+ *   type   {string}  Filter by asset type ('crypto' or 'stock').
+ *   active {boolean} Filter by is_active flag ('true' / 'false').
+ *   symbol {string}  Filter by exact ticker symbol (case-insensitive).
+ */
+
 import express from "express";
 import { QueryTypes } from "sequelize";
 import { getDbOrError, parseBoolean } from "../utils/task2_2.js";
@@ -5,6 +18,10 @@ import { parseLimit, parseString } from "../utils/query.js";
 
 const router = express.Router();
 
+/**
+ * GET /api/assets
+ * Returns asset records ordered alphabetically by symbol.
+ */
 router.get("/", async (req, res) => {
   const db = getDbOrError(res);
   if (!db) return;
@@ -14,6 +31,7 @@ router.get("/", async (req, res) => {
   const active = parseBoolean(req.query.active);
   const symbol = parseString(req.query.symbol);
 
+  // Build WHERE clause dynamically — only active filters are appended
   const conditions = [];
   const replacements = { limit };
 
