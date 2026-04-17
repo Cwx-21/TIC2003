@@ -71,6 +71,14 @@ function buildGraph(correlationData) {
 				yAxisID: "sentimentAxis",
 				pointRadius: 0,
 			},
+			{
+				label: "Divergence",
+				data: rows.map((r) => r.sentiment_price_divergence),
+				borderColor: "red",
+				backgroundColor: "red",
+				yAxisID: "sentimentAxis",
+				pointRadius: 0,
+			},
 		],
 	};
 }
