@@ -17,8 +17,5 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "dependencies": {
-    "chartjs-plugin-zoom": "^2.2.0",
-    "rollup": "^4.60.1"
-  }
+  "dependencies": {}
 }
