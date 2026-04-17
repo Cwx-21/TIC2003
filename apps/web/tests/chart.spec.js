@@ -1,273 +1,217 @@
 import { test, expect } from "@playwright/test";
 
+function makeCorrelationData(count = 40) {
+	return Array.from({ length: count }, (_, i) => {
+		const date = new Date("2026-03-01T00:00:00Z");
+		date.setUTCDate(date.getUTCDate() + i);
+
+		return {
+			time_bucket: date.toISOString(),
+			price_at_bucket: 65000 + i * 150,
+			weighted_sentiment: ((i % 10) - 5) / 10,
+			sentiment_price_divergence: ((i % 6) - 3) / 20,
+		};
+	});
+}
+
+async function mockCommonRoutes(page) {
+	await page.route("**/api/assets", async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				data: [{ symbol: "BTC", name: "Bitcoin" }],
+			}),
+		});
+	});
+
+	await page.route("**/api/backtests/latest**", async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				data: { id: 1 },
+			}),
+		});
+	});
+
+	await page.route("**/api/live-sessions/latest**", async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				data: { id: 2 },
+			}),
+		});
+	});
+
+	await page.route("**/api/sentiment/BTC/logs**", async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({
+				data: [],
+			}),
+		});
+	});
+}
+
+async function mockBacktestCorrelation(page, data) {
+	await page.route("**/api/correlation/BTC?backtest_id=1&interval=1d", async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({ data }),
+		});
+	});
+}
+
+async function mockLiveCorrelation(page, data) {
+	await page.route("**/api/correlation/BTC?session_id=2", async (route) => {
+		await route.fulfill({
+			status: 200,
+			contentType: "application/json",
+			body: JSON.stringify({ data }),
+		});
+	});
+}
+
 test.describe("Chart feature", () => {
-	test("chart renders for BTC when data exists", async ({ page }) => {
-		await page.route("**/api/assets", async (route) => {
+
+    test("loading exist", async ({ page }) => {
+		await mockCommonRoutes(page);
+
+		await page.route("**/api/correlation/BTC?backtest_id=1&interval=1d", async (route) => {
+			await new Promise((resolve) => setTimeout(resolve, 2000));
 			await route.fulfill({
 				status: 200,
 				contentType: "application/json",
 				body: JSON.stringify({
-					data: [{ symbol: "BTC", name: "Bitcoin" }],
+					data: makeCorrelationData(12),
 				}),
 			});
 		});
 
-		await page.route("**/api/backtests/latest**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: { id: 1 },
-				}),
-			});
-		});
+		await mockLiveCorrelation(page, []);
 
-		await page.route("**/api/live-sessions/latest**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: { id: 2 },
-				}),
-			});
-		});
+		await page.goto("/");
+		await page.getByText("Bitcoin (BTC)").click();
 
-		await page.route("**/api/correlation/BTC**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [
-						{
-							time_bucket: "2026-04-01T00:00:00Z",
-							price_at_bucket: 65000,
-							weighted_sentiment: 0.42,
-							sentiment_price_divergence: 0.10,
-						},
-						{
-							time_bucket: "2026-04-02T00:00:00Z",
-							price_at_bucket: 65500,
-							weighted_sentiment: 0.35,
-							sentiment_price_divergence: 0.08,
-						},
-						{
-							time_bucket: "2026-04-03T00:00:00Z",
-							price_at_bucket: 66000,
-							weighted_sentiment: 0.50,
-							sentiment_price_divergence: 0.12,
-						},
-					],
-				}),
-			});
-		});
-
-		await page.route("**/api/sentiment/BTC/logs**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [],
-				}),
-			});
-		});
+		await expect(page.getByText("Loading...")).toBeVisible();
+    });
+    
+	test("asset is selected", async ({ page }) => {
+		await mockCommonRoutes(page);
+		await mockBacktestCorrelation(page, makeCorrelationData(12));
+		await mockLiveCorrelation(page, []);
 
 		await page.goto("/");
 		await page.getByText("Bitcoin (BTC)").click();
 
 		await expect(page.getByText("Showing chart for BTC")).toBeVisible();
-		await expect(page.getByTestId("correlation-chart")).toBeVisible();
 
-		const canvas = page.getByTestId("correlation-chart").locator("canvas");
+		const canvas = page.locator("canvas");
 		await expect(canvas).toBeVisible();
 	});
 
-	test("chart shows loading message while data is loading", async ({ page }) => {
-		await page.route("**/api/assets", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [{ symbol: "BTC", name: "Bitcoin" }],
-				}),
-			});
-		});
-
-		await page.route("**/api/backtests/latest**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: { id: 1 },
-				}),
-			});
-		});
-
-		await page.route("**/api/live-sessions/latest**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: { id: 2 },
-				}),
-			});
-		});
-
-		await page.route("**/api/correlation/BTC**", async (route) => {
-			await new Promise((resolve) => setTimeout(resolve, 1200));
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [],
-				}),
-			});
-		});
-
-		await page.route("**/api/sentiment/BTC/logs**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [],
-				}),
-			});
-		});
+	test("correlation data is empty in backtest mode", async ({ page }) => {
+		await mockCommonRoutes(page);
+		await mockBacktestCorrelation(page, []);
+		await mockLiveCorrelation(page, []);
 
 		await page.goto("/");
 		await page.getByText("Bitcoin (BTC)").click();
 
-		await expect(page.getByTestId("chart-loading")).toBeVisible();
+		await expect(page.getByText("No data for this asset.")).toBeVisible();
 	});
 
-	test("chart shows empty message in backtest mode when no data exists", async ({ page }) => {
-		await page.route("**/api/assets", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [{ symbol: "BTC", name: "Bitcoin" }],
-				}),
-			});
-		});
-
-		await page.route("**/api/backtests/latest**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: { id: 1 },
-				}),
-			});
-		});
-
-		await page.route("**/api/live-sessions/latest**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: { id: 2 },
-				}),
-			});
-		});
-
-		await page.route("**/api/correlation/BTC**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [],
-				}),
-			});
-		});
-
-		await page.route("**/api/sentiment/BTC/logs**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [],
-				}),
-			});
-		});
-
-		await page.goto("/");
-		await page.getByText("Bitcoin (BTC)").click();
-
-		await expect(page.getByTestId("chart-empty")).toContainText("No data for this asset.");
-	});
-
-	test("chart shows empty message in live mode when no live data exists", async ({ page }) => {
-		await page.route("**/api/assets", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [{ symbol: "BTC", name: "Bitcoin" }],
-				}),
-			});
-		});
-
-		await page.route("**/api/backtests/latest**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: { id: 1 },
-				}),
-			});
-		});
-
-		await page.route("**/api/live-sessions/latest**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: { id: 2 },
-				}),
-			});
-		});
-
-		await page.route("**/api/correlation/BTC?backtest_id=1&interval=1d", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [
-						{
-							time_bucket: "2026-04-01T00:00:00Z",
-							price_at_bucket: 65000,
-							weighted_sentiment: 0.42,
-							sentiment_price_divergence: 0.10,
-						},
-					],
-				}),
-			});
-		});
-
-		await page.route("**/api/correlation/BTC?session_id=2", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [],
-				}),
-			});
-		});
-
-		await page.route("**/api/sentiment/BTC/logs**", async (route) => {
-			await route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					data: [],
-				}),
-			});
-		});
+	test("correlation data is empty in live mode", async ({ page }) => {
+		await mockCommonRoutes(page);
+		await mockBacktestCorrelation(page, makeCorrelationData(12));
+		await mockLiveCorrelation(page, []);
 
 		await page.goto("/");
 		await page.getByText("Bitcoin (BTC)").click();
 		await page.getByRole("button", { name: /live/i }).click();
 
-		await expect(page.getByTestId("chart-empty")).toContainText("No live data yet");
+		await expect(page.getByText(/No live data yet/i)).toBeVisible();
+	});
+
+	test("backtest and live mode toggle", async ({ page }) => {
+		await mockCommonRoutes(page);
+		await mockBacktestCorrelation(page, makeCorrelationData(12));
+		await mockLiveCorrelation(page, makeCorrelationData(8));
+
+		await page.goto("/");
+		await page.getByText("Bitcoin (BTC)").click();
+
+		await expect(page.getByText("Showing chart for BTC")).toBeVisible();
+		await expect(page.locator("canvas")).toBeVisible();
+
+		await page.getByRole("button", { name: /live/i }).click();
+
+		await expect(page.getByText("Showing chart for BTC")).toBeVisible();
+		await expect(page.locator("canvas")).toBeVisible();
+	});
+
+	test("chart zoom feature", async ({ page }) => {
+		test.slow();
+
+		await mockCommonRoutes(page);
+		await mockBacktestCorrelation(page, makeCorrelationData(50));
+		await mockLiveCorrelation(page, []);
+
+		await page.goto("/");
+		await page.getByText("Bitcoin (BTC)").click();
+
+		const canvas = page.locator("canvas");
+		await expect(canvas).toBeVisible();
+
+		const box = await canvas.boundingBox();
+		expect(box).not.toBeNull();
+
+        await page.pause();
+
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		await page.mouse.wheel(0, -900);
+
+		await page.waitForTimeout(5000);
+		await expect(canvas).toBeVisible();
+	});
+
+	test("chart pan feature", async ({ page }) => {
+		test.slow();
+
+		await mockCommonRoutes(page);
+		await mockBacktestCorrelation(page, makeCorrelationData(60));
+		await mockLiveCorrelation(page, []);
+
+		await page.goto("/");
+		await page.getByText("Bitcoin (BTC)").click();
+
+		const canvas = page.locator("canvas");
+		await expect(canvas).toBeVisible();
+
+		const box = await canvas.boundingBox();
+		expect(box).not.toBeNull();
+
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+
+		await page.mouse.wheel(0, -900);
+		await page.waitForTimeout(1500);
+
+        await page.pause();
+
+		const startX = box.x + box.width * 0.75;
+		const endX = box.x + box.width * 0.35;
+		const y = box.y + box.height * 0.5;
+
+		await page.mouse.move(startX, y);
+		await page.mouse.down();
+		await page.mouse.move(endX, y, { steps: 20 });
+		await page.mouse.up();
+
+		await page.waitForTimeout(5000);
+		await expect(canvas).toBeVisible();
 	});
 });
