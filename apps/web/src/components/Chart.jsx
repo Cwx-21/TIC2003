@@ -116,12 +116,14 @@ function Chart({
         />
       </div>
 
-      {loading && <p>Loading...</p>}
-      {!loading && correlationData.length > 0 && (
-        <Line data={chartData} options={chartOptions} />
+      {loading && <p data-testid="chart-loading">Loading...</p>}
+		  {!loading && correlationData.length > 0 && (
+			  <div data-testid="correlation-chart">
+				  <Line data={chartData} options={chartOptions} />
+				</div>
       )}
       {!loading && correlationData.length === 0 && (
-        <div className="empty-container">{emptyMessage}</div>
+        <div className="empty-container" data-testid="chart-empty">{emptyMessage}</div>
       )}
     </div>
   );

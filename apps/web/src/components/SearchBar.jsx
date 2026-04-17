@@ -4,12 +4,13 @@ function SearchBar({ title, placeholder, search, setSearch }) {
         <div className='header'>
           <h2>{title}</h2>
         </div>
-    <input
-      type='text'
-      placeholder={placeholder}
-      className='search-input'
-      value={search}
-      onChange={(event) => setSearch(event.target.value)}
+      <input
+        data-testid="asset-search"
+        type='text'
+        placeholder={placeholder}
+        className='search-input'
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
       />
   </div>
     

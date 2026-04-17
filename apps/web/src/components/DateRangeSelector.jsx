@@ -9,6 +9,7 @@ function DateRangeSelector({
   return (
     <div className="select-controls">
       <select
+        data-testid="preset-select"
         className="select"
         value={datePreset}
         onChange={(event) => handleDatePresetChange(event.target.value)}
@@ -22,6 +23,7 @@ function DateRangeSelector({
       <div>
         <label className="date-label">Start Date</label>
         <input
+          data-testid="date-start"
           type="date"
           className="select"
           value={startDate}
@@ -32,6 +34,7 @@ function DateRangeSelector({
       <div>
         <label className="date-label">End Date</label>
         <input
+          data-testid="date-end"
           className="select"
           type="date"
           value={endDate}
@@ -40,6 +43,7 @@ function DateRangeSelector({
       </div>
 
       <button
+        data-testid="date-clear"
         className="btn-primary"
         onClick={() => {
           setStartDate("");

@@ -9,12 +9,12 @@ function SentimentTable({ selectedAsset, comments, error }) {
 		<div className="container">
 			<h2>Comments and Sentiment</h2>
 
-			{error && <p>{error}</p>}
+			{error && <p data-testid="error-message">{error}</p>}
 
-			{!error && displayedComments.length === 0 && <p>No comments found.</p>}
+			{!error && displayedComments.length === 0 && <p data-testid="no-comments-message">No comments found.</p>}
 
 			{displayedComments.length > 0 && (
-				<div className="sentiment-table-wrapper">
+				<div className="sentiment-table-wrapper" data-testid="sentiment-table">
 					<table className="sentiment-table">
 						<thead>
 							<tr>
