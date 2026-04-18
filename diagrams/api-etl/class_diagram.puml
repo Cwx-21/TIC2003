@@ -1,0 +1,133 @@
+@startuml class_diagram
+title HypeCheck ETL Pipeline — Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 13
+skinparam classBackgroundColor #FAFAFA
+skinparam classBorderColor #555555
+skinparam arrowColor #333333
+skinparam shadowing false
+skinparam nodesep 30
+skinparam ranksep 50
+
+' ─────────────────────────────────────────
+'  Abstract / Interface
+' ─────────────────────────────────────────
+abstract class AlertObserver {
+    + {abstract} on_divergence_alert(symbol: str, divergence: float, weighted_avg: float, price_change_pct: float, current_price: float, msg_count: int, timestamp: datetime, session_id: int) : None
+    + {abstract} on_volume_spike_alert(symbol: str, msg_count: int, baseline: int, timestamp: datetime, session_id: int) : None
+}
+
+' ─────────────────────────────────────────
+'  Concrete Classes
+' ─────────────────────────────────────────
+class DatabaseAlertObserver {
+    + on_divergence_alert(symbol: str, divergence: float, weighted_avg: float, price_change_pct: float, current_price: float, msg_count: int, timestamp: datetime, session_id: int) : None
+    + on_volume_spike_alert(symbol: str, msg_count: int, baseline: int, timestamp: datetime, session_id: int) : None
+}
+
+class SentimentAggregator {
+    + __init__() : None
+    + run(backtest_id: int, intervals: list) : None
+}
+
+class CorrelationEngine {
+    - divergence_threshold: float
+    - volume_spike_threshold: float
+    + __init__(divergence_threshold: float, volume_spike_threshold: float) : None
+    + run(backtest_id: int, interval: str) : None
+    - _generate_alerts(merged_df: DataFrame, symbol: str, backtest_id: int) : int
+}
+
+class BacktestRunner {
+    + analyzer: SentimentIntensityAnalyzer
+    + config: dict
+    + assets: list
+    + __init__() : None
+    + identify_asset(text: str) : str
+    + run() : None
+}
+
+class LiveProcessor {
+    + session_id: int
+    + interval: str
+    + assets: list
+    - _observers: list
+    + __init__(session_id: int) : None
+    + register_observer(observer: AlertObserver) : None
+    - _notify_divergence(symbol: str, divergence: float, weighted_avg: float, price_change_pct: float, current_price: float, msg_count: int, timestamp: datetime) : None
+    - _notify_volume_spike(symbol: str, msg_count: int, baseline: int, timestamp: datetime) : None
+    + process_window(start_time: datetime, end_time: datetime) : None
+}
+
+class TelegramMonitor {
+    + client: TelegramClient
+    + analyzer: SentimentIntensityAnalyzer
+    + config: dict
+    + target_channels: list
+    + assets: list
+    + session_id: int
+    + message_count: int
+    + __init__(session_id: int) : None
+    + identify_asset(text: str) : str
+    + start() : None
+    + process_message(event: Event) : None
+}
+
+' ─────────────────────────────────────────
+'  Utility Modules (shown as classes)
+' ─────────────────────────────────────────
+class "«module»\nalert_generator" as AlertGenerator {
+    + check_divergence_alert(symbol: str, divergence: float) : bool
+    + generate_divergence_alert(...) : dict
+    + generate_volume_spike_alert(...) : dict
+}
+
+class "«module»\nasset_matcher" as AssetMatcher {
+    + identify_asset(text: str, assets: list) : str
+}
+
+class "«module»\ncredibility_engine" as CredibilityEngine {
+    + calculate_credibility(source: str, metadata: dict, content: str) : float
+}
+
+class "«module»\nprice_fetcher" as PriceFetcher {
+    + get_live_price(symbol: str) : float
+    + get_historical_ohlcv(symbol: str, start: date, end: date) : DataFrame
+}
+
+class "«module»\ndb" as DB {
+    + get_db_connection() : Connection
+    + init_db() : None
+}
+
+' ─────────────────────────────────────────
+'  Relationships
+' ─────────────────────────────────────────
+
+' Inheritance
+DatabaseAlertObserver --|> AlertObserver : implements
+
+' Composition — BacktestRunner creates and owns these engines
+BacktestRunner *-- SentimentAggregator : creates / uses
+BacktestRunner *-- CorrelationEngine   : creates / uses
+
+' Aggregation — LiveProcessor aggregates observers
+LiveProcessor o-- AlertObserver : observes (0..*)
+LiveProcessor *-- DatabaseAlertObserver : default observer
+
+' Dependencies (dashed)
+BacktestRunner    ..> AssetMatcher       : <<uses>>
+TelegramMonitor   ..> AssetMatcher       : <<uses>>
+BacktestRunner    ..> CredibilityEngine  : <<uses>>
+TelegramMonitor   ..> CredibilityEngine  : <<uses>>
+BacktestRunner    ..> DB                 : <<persists>>
+LiveProcessor     ..> DB                 : <<persists>>
+TelegramMonitor   ..> DB                 : <<persists>>
+CorrelationEngine ..> DB                 : <<reads/writes>>
+CorrelationEngine ..> AlertGenerator     : <<uses>>
+LiveProcessor     ..> AlertGenerator     : <<uses>>
+BacktestRunner    ..> PriceFetcher       : <<uses>>
+CorrelationEngine ..> PriceFetcher       : <<uses>>
+
+@enduml
