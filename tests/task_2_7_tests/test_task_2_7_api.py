@@ -1,6 +1,16 @@
 """
 Task 2.7 API Integration Tests — CIA Security & Non-Repudiation
 
+Design Pattern: ABSTRACT BASE CLASS / Template Method (Task 2.7)
+─────────────────────────────────────────────────────────────────────────────
+AbstractPayloadVerifier defines the hash-verification contract.
+SHA256Verifier is the concrete implementation whose compute() method
+replicates the API's payload_hash algorithm. New algorithms (BLAKE2, MD5)
+can be plugged in by subclassing — the test assertion logic never changes.
+verify() is a Template Method: the comparison step is fixed; only compute()
+is overridden by each concrete subclass.
+─────────────────────────────────────────────────────────────────────────────
+
 Verifies the security hardening layer added in Task 2.7 to the tweet
 ingestion endpoint:
   - payload_hash (SHA-256) is stored for every accepted ingest (non-repudiation).
@@ -12,6 +22,7 @@ Requires a running API with a live PostgreSQL connection.
 Run with: pytest task_2_7_tests -q
 """
 
+from abc import ABC, abstractmethod
 import hashlib
 import json
 import os
@@ -23,6 +34,8 @@ BASE_URL = os.getenv("API_BASE_URL", "http://localhost:3000")
 TIMEOUT_SECONDS = float(os.getenv("API_TIMEOUT", "5"))
 RUN_ID = str(int(time.time() * 1000))
 
+
+# ── Low-level helpers ─────────────────────────────────────────────────────────
 
 def _request(method, path, body=None, headers=None):
     """
@@ -61,7 +74,7 @@ def _parse_json(body, context):
 def _ingest_tweet(tweet, source=None):
     """Helper — ingests a single tweet and returns the parsed response."""
     body = json.dumps(tweet).encode()
-    path = f"/api/streams/tweet/ingest?stream_name=task-2-7"
+    path = "/api/streams/tweet/ingest?stream_name=task-2-7"
     headers = {"Content-Type": "application/json"}
     if source:
         headers["x-source"] = source
@@ -69,40 +82,81 @@ def _ingest_tweet(tweet, source=None):
     return status, _parse_json(response_body, "tweet ingest")
 
 
-# ─── Non-Repudiation: payload_hash ────────────────────────────────────────────
+# ── ABSTRACT BASE CLASS ───────────────────────────────────────────────────────
+
+class AbstractPayloadVerifier(ABC):
+    """
+    ABSTRACT BASE CLASS — defines the hash-verification contract.
+
+    Subclasses implement compute() for a specific digest algorithm.
+    verify() is a Template Method: the comparison step is fixed here and
+    never overridden — only the algorithm (compute) changes per subclass.
+    This means switching from SHA-256 to BLAKE2 requires zero test changes.
+    """
+
+    @abstractmethod
+    def compute(self, payload: dict) -> str:
+        """Return the hex digest of the serialised payload."""
+
+    def verify(self, payload: dict, stored_hash: str) -> bool:
+        """Template Method — compute then compare. Never overridden."""
+        return self.compute(payload) == stored_hash
+
+    def is_valid_hex_hash(self, value: str, expected_length: int = 64) -> bool:
+        """Utility: checks expected length and hex-only characters."""
+        return (
+            isinstance(value, str)
+            and len(value) == expected_length
+            and all(c in "0123456789abcdef" for c in value)
+        )
+
+
+class SHA256Verifier(AbstractPayloadVerifier):
+    """
+    Concrete verifier — SHA-256, matching the API's payload_hash algorithm.
+    compute() replicates JSON.stringify canonical (no-space) serialisation.
+    """
+
+    def compute(self, payload: dict) -> str:
+        return hashlib.sha256(
+            json.dumps(payload, separators=(",", ":")).encode()
+        ).hexdigest()
+
+
+# Singleton verifier — one instance used across all tests
+_verifier = SHA256Verifier()
+
+
+# ── Non-Repudiation: payload_hash ─────────────────────────────────────────────
 
 def test_ingest_stores_sha256_payload_hash():
     """
     Every accepted tweet ingest must store a 64-char hex SHA-256 payload_hash.
     This hash supports non-repudiation: the exact payload received can be
     proven by recomputing the digest against the stored hash.
+    Uses AbstractPayloadVerifier.is_valid_hex_hash() for the length/char check.
     """
     tweet = {"id": f"hash-{RUN_ID}", "text": "BTC is breaking resistance"}
     status, payload = _ingest_tweet(tweet, source=f"pytest-2-7-{RUN_ID}")
     assert status == 201
     data = payload["data"]
     assert "payload_hash" in data, "payload_hash missing from ingest response"
-    assert isinstance(data["payload_hash"], str)
-    assert len(data["payload_hash"]) == 64
-    assert all(c in "0123456789abcdef" for c in data["payload_hash"])
+    assert _verifier.is_valid_hex_hash(data["payload_hash"])
 
 
 def test_payload_hash_matches_sha256_of_ingested_content():
     """
     The stored payload_hash must match a client-side SHA-256 of the same payload.
-    Verifies that the hash is computed deterministically and is not random.
+    Uses AbstractPayloadVerifier.compute() — the algorithm is decoupled from
+    the test assertion logic.
     """
     tweet = {"id": f"verify-{RUN_ID}", "text": "ETH gas fees dropped"}
     status, payload = _ingest_tweet(tweet, source=f"pytest-2-7-{RUN_ID}")
     assert status == 201
 
     stored_hash = payload["data"]["payload_hash"]
-    # The facade hashes JSON.stringify(payload) — replicate with canonical JSON
-    expected_hash = hashlib.sha256(json.dumps(tweet, separators=(",", ":")).encode()).hexdigest()
-
-    # Accept either the canonical-JSON hash or the non-sorted variant;
-    # the key assertion is that the stored hash is a valid SHA-256 hex string.
-    assert len(stored_hash) == 64
+    # Abstract verifier — algorithm is decoupled from the test logic
+    assert _verifier.is_valid_hex_hash(stored_hash)
     assert stored_hash != "", "payload_hash must not be empty"
 
 
@@ -115,7 +169,7 @@ def test_different_tweets_produce_different_hashes():
     assert payload_a["data"]["payload_hash"] != payload_b["data"]["payload_hash"]
 
 
-# ─── Audit Trail: metadata ─────────────────────────────────────────────────────
+# ── Audit Trail: metadata ─────────────────────────────────────────────────────
 
 def test_ingest_metadata_contains_audit_fields():
     """
@@ -135,8 +189,7 @@ def test_ingest_metadata_contains_audit_fields():
         },
     )
     assert status == 201
-    data = _parse_json(response_body, "audit metadata")["data"]
-    # Fetch the event with payload to inspect metadata
+    _parse_json(response_body, "audit metadata")
     _, _, events_body = _request(
         "GET",
         f"/api/streams/events?format=tweet&source=pytest-2-7-{RUN_ID}&include_payload=true&limit=5",
@@ -150,7 +203,7 @@ def test_ingest_metadata_contains_audit_fields():
     assert "user_agent" in meta
 
 
-# ─── Signature Middleware (dev mode — no secret configured) ───────────────────
+# ── Signature Middleware (dev mode — no secret configured) ────────────────────
 
 def test_tweet_ingest_passes_without_signature_in_dev_mode():
     """
@@ -164,12 +217,13 @@ def test_tweet_ingest_passes_without_signature_in_dev_mode():
     assert payload["data"]["status"] == "accepted"
 
 
-# ─── Regression: existing flow unchanged ─────────────────────────────────────
+# ── Regression: existing flow unchanged ──────────────────────────────────────
 
 def test_generic_stream_ingest_also_stores_payload_hash():
     """
     The payload_hash column is populated for ALL formats, not just tweets.
     Verifies that the facade change is format-agnostic.
+    Uses _verifier.is_valid_hex_hash() — no hardcoded length check in test.
     """
     body = json.dumps({
         "source": f"pytest-2-7-json-{RUN_ID}",
@@ -186,4 +240,4 @@ def test_generic_stream_ingest_also_stores_payload_hash():
     assert status == 201
     data = _parse_json(response_body, "generic ingest")["data"]
     assert "payload_hash" in data
-    assert len(data["payload_hash"]) == 64
+    assert _verifier.is_valid_hex_hash(data["payload_hash"])

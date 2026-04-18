@@ -1,0 +1,341 @@
+@startuml hypecheck_class_diagram
+title HypeCheck — Class Diagram (Tasks 2.5 – 2.7)
+
+skinparam classAttributeIconSize 0
+skinparam shadowing false
+skinparam defaultFontSize 11
+skinparam classFontStyle bold
+skinparam classBackgroundColor #FAFAFA
+skinparam classBorderColor #555555
+skinparam noteBackgroundColor #FFFDE7
+skinparam noteBorderColor #F9A825
+skinparam nodesep 20
+skinparam ranksep 40
+
+' ══════════════════════════════════════════════════════════════
+'  TASK 2.5 — Strategy & Factory: Stream Parsers
+' ══════════════════════════════════════════════════════════════
+
+abstract class BaseStreamParser {
+  + key : String
+  + formats : Set<String>
+  --
+  + supports(format : String) : Boolean
+  + {abstract} parse(options : Object) : Object
+  # normalizeTextPayload(payload : any) : String
+  # normalizeBinaryPayload(payload : any) : Buffer
+  # finalizeResult(options : Object) : Object
+}
+
+class JsonStreamParser {
+  + key : String = "json_parser"
+  --
+  + parse(options : Object) : Object
+}
+
+class CsvStreamParser {
+  + key : String = "csv_parser"
+  --
+  + parse(options : Object) : Object
+}
+
+class XmlStreamParser {
+  + key : String = "xml_parser"
+  --
+  + parse(options : Object) : Object
+}
+
+class TextStreamParser {
+  + key : String = "text_parser"
+  --
+  + parse(options : Object) : Object
+}
+
+class SpreadsheetBinaryParser {
+  + key : String = "spreadsheet_binary_parser"
+  --
+  + parse(options : Object) : Object
+}
+
+BaseStreamParser <|-- JsonStreamParser
+BaseStreamParser <|-- CsvStreamParser
+BaseStreamParser <|-- XmlStreamParser
+BaseStreamParser <|-- TextStreamParser
+BaseStreamParser <|-- SpreadsheetBinaryParser
+
+note right of BaseStreamParser
+  **Strategy** (Task 2.5)
+  Abstract algorithm contract;
+  concrete subclasses encapsulate
+  distinct parsing strategies.
+end note
+
+class StreamParserFactory {
+  - parsers : BaseStreamParser[]
+  --
+  + StreamParserFactory(parsers : BaseStreamParser[])
+  + getParser(format : String) : BaseStreamParser
+  + supportedFormats() : String[]
+}
+
+note right of StreamParserFactory
+  **Factory** (Task 2.5)
+  Selects concrete parser by format;
+  callers are decoupled from
+  concrete parser classes.
+end note
+
+StreamParserFactory "1" o--> "many" BaseStreamParser : registered parsers
+
+' ══════════════════════════════════════════════════════════════
+'  TASK 2.5 — Facade & Repository
+' ══════════════════════════════════════════════════════════════
+
+class StreamEventRepository {
+  - DEFAULT_ATTRIBUTES : String[]
+  - PAYLOAD_ATTRIBUTES : String[]
+  --
+  + create(record : Object) : Promise<Model>
+  + listRecent(filters : Object) : Promise<Model[]>
+}
+
+note right of StreamEventRepository
+  **Repository** (Task 2.5)
+  Encapsulates all Sequelize ORM
+  calls; facade never touches
+  the DB layer directly.
+end note
+
+class StreamIngestionFacade {
+  - parserFactory : StreamParserFactory
+  - repository : StreamEventRepository
+  --
+  + StreamIngestionFacade(options : Object)
+  + ingest(envelope : Object) : Promise<Object>
+  + listRecent(options : Object) : Promise<Object[]>
+  + getHealthSnapshot() : Object
+}
+
+note left of StreamIngestionFacade
+  **Facade** (Task 2.5)
+  Single ingest() entry point:
+  validate → normalise → factory
+  → parse → hash → persist
+end note
+
+StreamIngestionFacade "1" *--> "1" StreamParserFactory : uses
+StreamIngestionFacade "1" *--> "1" StreamEventRepository : uses
+
+' ══════════════════════════════════════════════════════════════
+'  TASK 2.6 — Template Method: TweetStreamParser
+' ══════════════════════════════════════════════════════════════
+
+class TweetStreamParser {
+  + key : String = "tweet_parser"
+  --
+  + parse(options : Object) : Object
+  # extractText(tweet : Object) : String
+  # extractMetrics(tweet : Object) : Object
+  # extractEntities(tweet : Object) : Object
+}
+
+BaseStreamParser <|-- TweetStreamParser
+
+StreamParserFactory "1" o--> "1" TweetStreamParser : registered
+
+note right of TweetStreamParser
+  **Template Method** (Task 2.6)
+  parse() is the fixed algorithm;
+  extractText / extractMetrics /
+  extractEntities are overridable hooks.
+end note
+
+' ══════════════════════════════════════════════════════════════
+'  TASK 2.6 — Builder: TweetEnvelopeBuilder
+' ══════════════════════════════════════════════════════════════
+
+class TweetEnvelopeBuilder {
+  - _tweet : Object
+  - _source : String
+  - _streamName : String
+  - _metadata : Object
+  --
+  + TweetEnvelopeBuilder()
+  + withTweet(tweet : Object) : TweetEnvelopeBuilder
+  + withSource(source : String) : TweetEnvelopeBuilder
+  + withStreamName(name : String) : TweetEnvelopeBuilder
+  + withMetadata(meta : Object) : TweetEnvelopeBuilder
+  + build() : Object
+}
+
+note right of TweetEnvelopeBuilder
+  **Builder** (Task 2.6)
+  Fluent API constructs the
+  standard ingest envelope from
+  a raw Twitter API v2 tweet.
+end note
+
+TweetEnvelopeBuilder ..> StreamIngestionFacade : builds envelope for
+
+' ══════════════════════════════════════════════════════════════
+'  TASK 2.6 — Chain of Responsibility: Tweet Validation
+' ══════════════════════════════════════════════════════════════
+
+abstract class TweetValidationHandler {
+  - _next : TweetValidationHandler
+  --
+  + setNext(handler : TweetValidationHandler) : TweetValidationHandler
+  + validate(tweet : Object) : void
+}
+
+class TweetRequiredFieldsValidator {
+  --
+  + validate(tweet : Object) : void
+}
+
+class TweetTextLengthValidator {
+  - MAX_LENGTH : int = 280
+  --
+  + validate(tweet : Object) : void
+}
+
+class TweetTimestampValidator {
+  --
+  + validate(tweet : Object) : void
+}
+
+TweetValidationHandler <|-- TweetRequiredFieldsValidator
+TweetValidationHandler <|-- TweetTextLengthValidator
+TweetValidationHandler <|-- TweetTimestampValidator
+
+TweetRequiredFieldsValidator "1" --> "1" TweetTextLengthValidator : next
+TweetTextLengthValidator "1" --> "1" TweetTimestampValidator : next
+
+note bottom of TweetValidationHandler
+  **Chain of Responsibility** (Task 2.6)
+  Each handler validates one concern
+  and passes to the next.
+  RequiredFields → TextLength → Timestamp
+end note
+
+' ══════════════════════════════════════════════════════════════
+'  TASK 2.6 — Decorator: RetryingStreamIngestionFacade
+' ══════════════════════════════════════════════════════════════
+
+class RetryingStreamIngestionFacade {
+  - _facade : StreamIngestionFacade
+  - _maxRetries : int
+  - _baseDelayMs : int
+  --
+  + RetryingStreamIngestionFacade(facade, maxRetries : int, baseDelayMs : int)
+  + ingest(envelope : Object) : Promise<Object>
+  + listRecent(options : Object) : Promise<Object[]>
+  + getHealthSnapshot() : Object
+}
+
+note right of RetryingStreamIngestionFacade
+  **Decorator** (Task 2.6)
+  Wraps any facade-compatible instance;
+  retries transient DB errors with
+  exponential backoff. Does not retry
+  StreamValidationError or SyntaxError.
+end note
+
+RetryingStreamIngestionFacade "1" o--> "1" StreamIngestionFacade : wraps
+
+' ══════════════════════════════════════════════════════════════
+'  TASK 2.7 — Strategy + Null Object: Signature Verification
+' ══════════════════════════════════════════════════════════════
+
+abstract class BaseSignatureVerifier {
+  --
+  + {abstract} verify(req : Request, res : Response, next : Function) : void
+}
+
+class HmacSignatureVerifier {
+  - _secret : String
+  --
+  + HmacSignatureVerifier(secret : String)
+  + verify(req : Request, res : Response, next : Function) : void
+}
+
+class NullSignatureVerifier {
+  --
+  + verify(req : Request, res : Response, next : Function) : void
+}
+
+BaseSignatureVerifier <|-- HmacSignatureVerifier
+BaseSignatureVerifier <|-- NullSignatureVerifier
+
+note right of HmacSignatureVerifier
+  **Strategy** (Task 2.7) — production
+  Validates x-twitter-webhooks-signature
+  header via HMAC-SHA256.
+  Uses timingSafeEqual to prevent
+  timing-based side-channel attacks.
+end note
+
+note right of NullSignatureVerifier
+  **Null Object** (Task 2.7) — development
+  Passes all requests through;
+  emits console.warn().
+  Same interface — no null-checks
+  needed in the route handler.
+end note
+
+' ══════════════════════════════════════════════════════════════
+'  TASK 2.7 — Crypto Utilities (Non-Repudiation)
+' ══════════════════════════════════════════════════════════════
+
+class CryptoUtils <<utility>> {
+  + {static} computePayloadHash(data : any) : String
+  + {static} verifyHmacSignature(secret : String, payload : any, signature : String) : Boolean
+}
+
+note right of CryptoUtils
+  **Non-Repudiation** (Task 2.7)
+  SHA-256 hash stored per record
+  proves exact bytes received.
+  HMAC verifies sender identity.
+end note
+
+HmacSignatureVerifier ..> CryptoUtils : verifyHmacSignature()
+StreamIngestionFacade ..> CryptoUtils : computePayloadHash()
+
+' ══════════════════════════════════════════════════════════════
+'  ETL — Observer Pattern (live_engine.py)
+' ══════════════════════════════════════════════════════════════
+
+abstract class AlertObserver {
+  --
+  + {abstract} on_divergence_alert(symbol : str, divergence : float, weighted_avg : float, price_change_pct : float, current_price : float, msg_count : int, timestamp : datetime, session_id : int) : None
+  + {abstract} on_volume_spike_alert(symbol : str, msg_count : int, baseline : int, timestamp : datetime, session_id : int) : None
+}
+
+class DatabaseAlertObserver {
+  --
+  + on_divergence_alert(symbol : str, divergence : float, weighted_avg : float, price_change_pct : float, current_price : float, msg_count : int, timestamp : datetime, session_id : int) : None
+  + on_volume_spike_alert(symbol : str, msg_count : int, baseline : int, timestamp : datetime, session_id : int) : None
+}
+
+class LiveProcessor {
+  - _observers : AlertObserver[]
+  - session_id : int
+  --
+  + LiveProcessor(session_id : int)
+  + register_observer(observer : AlertObserver) : None
+  - _notify_divergence(symbol : str, divergence : float, weighted_avg : float, price_change_pct : float, current_price : float, msg_count : int, timestamp : datetime) : None
+  - _notify_volume_spike(symbol : str, msg_count : int, baseline : int, timestamp : datetime) : None
+}
+
+note right of LiveProcessor
+  **Observer** (ETL)
+  Notifies registered observers
+  on anomaly detection; decouples
+  alert triggering from DB writes.
+end note
+
+AlertObserver <|-- DatabaseAlertObserver
+LiveProcessor "1" o--> "many" AlertObserver : _observers
+
+@enduml
